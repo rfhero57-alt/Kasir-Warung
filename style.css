@@ -684,23 +684,36 @@ pre {
 /* ==========================================================================
    PRINT STYLES (Struk Thermal 58mm)
    ========================================================================== */
+/* ==========================================================================
+   PRINT STYLES (Dioptimalkan untuk Struk Thermal Panjang Utuh)
+   ========================================================================== */
 @media print {
+  /* Sembunyikan semua elemen aplikasi kecuali kotak struk */
   body * {
     visibility: hidden;
   }
+  
   #struk, #struk * {
     visibility: visible;
   }
+  
   #struk {
     position: absolute;
     left: 0;
     top: 0;
-    width: 58mm;
+    width: 58mm; /* Sesuaikan menjadi 80mm jika memakai printer thermal besar */
     background: white;
     color: black;
     font-size: 12px;
-    padding: 5px;
+    padding: 0;
+    margin: 0;
     box-shadow: none;
+    
+    /* ⚡ PERBAIKAN UTAMA: Hapus paksa batasan tinggi dan scrollbar saat dicetak */
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    white-space: pre-wrap !important;
   }
 }
 /* ==========================================================================
