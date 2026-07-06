@@ -129,7 +129,7 @@ function transaksiBaru() {
     document.getElementById("totalBelanja").innerHTML = "Total Belanja: Rp 0";
     document.getElementById("uangBayar").value = "";
     document.getElementById("hasilKembalian").innerHTML = "Kembalian: Rp 0";
-    document.getElementById("struk").innerHTML = "Belum ada struk.";
+    document.getElementById("").innerHTML = "Belum ada .";
 
     kosongkanInputBarang();
     bukaInputTransaksi();
@@ -746,6 +746,17 @@ function buatStruk() {
     let telpToko = localStorage.getItem("setTelpToko") || "";
     let footerToko = localStorage.getItem("setKakiStruk") || "Terima Kasih";
 
+    // ⚡ AMBIL NOMOR TOKEN YANG DIKETIK KASIR
+    let nomorToken = document.getElementById("nomorTokenListrik").value.trim();
+    let barisToken = "";
+    
+    // Jika kasir mengisi nomor token, susun teksnya untuk struk
+    if (nomorToken !== "") {
+        barisToken = `--------------------------------\n` +
+                     `⚡ NOMOR TOKEN PLN / VOUCHER:\n` +
+                     `${nomorToken}\n`;
+    }
+
     daftarItem.forEach(function(item) {
         daftar += `${item.nama}\n  ${item.jumlah} x ${formatRupiah(item.harga)} = ${formatRupiah(item.subtotal)}\n`;
     });
@@ -765,9 +776,11 @@ function buatStruk() {
         `TOTAL     : ${formatRupiah(total)}\n` +
         `BAYAR     : ${formatRupiah(bayar)}\n` +
         `KEMBALIAN : ${formatRupiah(kembalian)}\n` +
+        barisToken + // ⚡ Nomor token otomatis terselip di sini jika ada isinya
         `--------------------------------\n` +
         `${footerToko}\n`;
 
+    // Kirim data ke Google Sheets
     let dataTransaksi = {
         tanggal: tanggal,
         kasir: kasirNama,
@@ -776,10 +789,14 @@ function buatStruk() {
         bayar: bayar,
         kembalian: kembalian,
         totalLaba: totalLaba,
+        token: nomorToken, // Tambahkan data token agar ikut terarsip di cloud jika perlu
         items: JSON.parse(JSON.stringify(daftarItem))
     };
 
     fetch(WEB_APP_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(dataTransaksi) });
+
+    // Kosongkan kembali input token setelah transaksi selesai
+    document.getElementById("nomorTokenListrik").value = "";
 
     setTimeout(function() {
         ambilBarangDariSheet();
