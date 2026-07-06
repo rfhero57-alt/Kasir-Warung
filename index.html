@@ -135,6 +135,11 @@
                         <div id="daftarBelanja"></div>
                         <div class="total-box">
                             <h2 id="totalBelanja">Total Belanja: Rp 0</h2>
+                            <!-- Tambahkan di index.html (di area Kasir/Pembayaran) -->
+                            <div class="filter-group full" id="boxTokenListrik" style="margin-top: 10px;">
+                                <label for="nomorTokenListrik">⚡ Nomor Token PLN / Catatan Voucher</label>
+                                <input type="text" id="nomorTokenListrik" placeholder="Contoh: 1234-5678-xxxx-xxxx-xxxx" style="font-weight: bold; letter-spacing: 2px;">
+                            </div>
                             <input id="uangBayar" type="number" placeholder="Uang bayar" onkeydown="enterBayar(event)">
                             <div class="button-row">
                                 <button id="tombolBayar" onclick="hitungKembalian()">Bayar</button>
