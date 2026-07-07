@@ -1202,68 +1202,92 @@ function nyalakanScannerKamera() {
 
 // 2. Fungsi eksekusi ketika kamera berhasil mengenali kode barcode
 function ketikaBarcodeTerbaca(decodedText, decodedResult) {
-    if (sistemSedangMembaca) return; // Jika barang sebelumnya sedang diproses, abaikan frame ini
-    sistemSedangMembaca = true;
+    if (sistemSedangMembaca) return; // Kunci frame agar tidak duplikasi scan[cite: 3]
+    sistemSedangMembaca = true; //[cite: 3]
 
-    // Mainkan efek suara bip kasir instan sebagai tanda sukses
-    bunyiBipKasir();
+    bunyiBipKasir(); // Bunyi cekrek kasir[cite: 3]
 
-    document.getElementById("statusScan").innerHTML = `⚡ Barcode Terbaca: ${decodedText}`;
-    document.getElementById("statusScan").style.color = "var(--yellow)";
+    document.getElementById("statusScan").innerHTML = `⚡ Barcode Terbaca: ${decodedText}`; //[cite: 3]
+    document.getElementById("statusScan").style.color = "var(--yellow)"; //[cite: 2, 3]
 
-    let selectElement = document.getElementById("pilihBarang");
-    let ketemu = false;
+    let selectElement = document.getElementById("pilihBarang"); //[cite: 3]
+    let ketemu = false; //[cite: 3]
 
-    // Looping data di dalam dropdown jualan kasir untuk mencari kode yang cocok
-    for (let i = 1; i < selectElement.options.length; i++) {
-        let valueData = selectElement.options[i].value;
-        if (valueData === "") continue;
+    // 1. TAHAP SATU: Cari di Database Internal Toko Anda Sendiri[cite: 3]
+    for (let i = 1; i < selectElement.options.length; i++) { //[cite: 3]
+        let valueData = selectElement.options[i].value; //[cite: 3]
+        if (valueData === "") continue; //[cite: 3]
 
-        let pecahData = valueData.split("|");
-        let kodeDatabase = pecahData[0]; // Kode barang ada di indeks ke-0
+        let pecahData = valueData.split("|"); //[cite: 3]
+        let kodeDatabase = pecahData[0]; //[cite: 3]
 
-        // Jika kode produk di database COCOK dengan nomor barcode dari kamera
-        if (kodeDatabase === decodedText) {
-            selectElement.value = valueData;
+        if (kodeDatabase === decodedText) { //[cite: 3]
+            selectElement.value = valueData; //[cite: 3]
+            isiBarangOtomatis(); // Masukkan form[cite: 3]
+            tambahBarang(); // Masukkan keranjang belanja[cite: 3]
             
-            // Panggil fungsi bawaan aplikasi Anda untuk mengisi form & memasukkan ke daftar belanja
-            isiBarangOtomatis(); 
-            tambahBarang();      
-            
-            document.getElementById("statusScan").innerHTML = `✅ Masuk Keranjang: ${pecahData[1]}`;
-            document.getElementById("statusScan").style.color = "var(--green)";
-            ketemu = true;
-            break;
+            document.getElementById("statusScan").innerHTML = `✅ Masuk Keranjang: ${pecahData[1]}`; //[cite: 3]
+            document.getElementById("statusScan").style.color = "var(--green)"; //[cite: 1, 3]
+            ketemu = true; //[cite: 3]
+            break; //[cite: 3]
         }
     }
 
-    // Jika nomor barcode barang belum ada di database jualan
+    // 2. TAHAP DUA: Jika Tidak Ada di Toko, Cari Otomatis ke Kamus 32rb Barcode (Cloud)
     if (!ketemu) {
-        let mauDaftar = confirm(`Barcode "${decodedText}" belum ada di database.\nMau daftarkan sebagai barang baru sekarang?`);
-        if (mauDaftar) {
-            bukaMenu('barang');
-            bukaModalBarang('tambah');
-            // Masukkan nomor kode scan tadi langsung ke form input Kode Barang Baru
-            let inputKodeModal = document.getElementById("modalKode");
-            if (inputKodeModal) inputKodeModal.value = decodedText;
-        }
-        document.getElementById("statusScan").innerHTML = "❌ Barcode Tidak Terdaftar";
-        document.getElementById("statusScan").style.color = "var(--red)";
+        document.getElementById("statusScan").innerHTML = "🔍 Mencari di Kamus Nasional...";
+        document.getElementById("statusScan").style.color = "var(--muted)"; //[cite: 1]
+        
+        // Fungsi callback penangkap respon dari server Google Sheets
+        window.responKamusBarcode = function(hasil) {
+            if (hasil.ketemu) {
+                // Jika ketemu di Kamus 32rb data, langsung pindah menu dan tembak form modal
+                bukaMenu('barang'); //[cite: 3]
+                bukaModalBarang('tambah'); //[cite: 3]
+                
+                // Isi form otomatis secara instan tanpa ketik!
+                document.getElementById("modalKode").value = decodedText; //
+                document.getElementById("modalNama").value = hasil.nama; //
+                document.getElementById("modalKategori").value = hasil.kategori || "Makanan"; //[cite: 2]
+                
+                document.getElementById("statusScan").innerHTML = `✨ Terdeteksi: ${hasil.nama}`;
+                document.getElementById("statusScan").style.color = "var(--green)"; //[cite: 1]
+                
+                // Fokuskan kursor langsung ke form Harga Jual biar kasir tinggal ketik angka harga saja
+                setTimeout(() => {
+                    document.getElementById("modalHarga").focus(); //[cite: 2]
+                }, 150);
+                
+                alert(`📦 Produk Dikenal!\n"${hasil.nama}" otomatis diinput ke sistem.\n\nSilakan isi Harga Modal, Harga Jual, dan Stok untuk mendaftarkannya di toko Anda.`);
+            } else {
+                // Jika benar-benar asing (tidak ada di kamus juga)
+                let mauDaftar = confirm(`Barcode "${decodedText}" tidak ada di toko maupun kamus nasional.\nMau daftarkan manual dari nol?`);
+                if (mauDaftar) {
+                    bukaMenu('barang'); //[cite: 3]
+                    bukaModalBarang('tambah'); //[cite: 3]
+                    document.getElementById("modalKode").value = decodedText; //[cite: 2]
+                }
+            }
+        };
+
+        // Kirim perintah JSONP aman ke Google Sheets Tab Kamus
+        let scriptLama = document.getElementById("cariKamus");
+        if (scriptLama) scriptLama.remove();
+        
+        let script = document.createElement("script");
+        script.id = "cariKamus";
+        script.src = WEB_APP_URL + `?callback=responKamusBarcode&tipe=cari_kamus_barcode&kode=${decodedText}`; //[cite: 3]
+        document.body.appendChild(script);
     }
 
-    // Berikan jeda toleransi 1,5 detik sebelum kamera diizinkan memindai item berikutnya
+    // Mengunci scanner selama 2 detik sebelum scan item berikutnya[cite: 3]
     setTimeout(() => {
-        sistemSedangMembaca = false;
-        // Kembalikan status ke normal jika pengguna masih berada di menu kasir
-        if (document.getElementById("menuKasir").style.display === "block") {
-            document.getElementById("statusScan").innerHTML = "🟢 Kamera Aktif (Dekatkan Barcode Produk)";
-            document.getElementById("statusScan").style.color = "var(--green)";
+        sistemSedangMembaca = false; //[cite: 3]
+        if (document.getElementById("menuKasir").style.display === "block") { //[cite: 3]
+            document.getElementById("statusScan").innerHTML = "🟢 Kamera Aktif (Dekatkan Barcode Produk)"; //[cite: 3]
+            document.getElementById("statusScan").style.color = "var(--green)"; //[cite: 1, 3]
         }
-    }, 1500);
-}
-
-function ketikaScanGagal(error) {
-    // Dibiarkan kosong agar tidak membanjiri tab console browser saat kamera sedang mencari fokus
+    }, 2000);
 }
 
 // 3. Pembuat efek suara digital pendek (Bip!) tanpa aset file eksternal
@@ -1331,4 +1355,39 @@ function updateDashboard() {
     elTransaksi.innerText = totalTransaksi;
     elHampirHabis.innerText = jmlHampirHabis;
     elHabis.innerText = jmlHabis;
+}
+//======================================================
+// INTERAKSI DASHBOARD KE MASTER BARANG
+//======================================================
+function klikDashboardStok(kondisi) {
+    // 1. Pindah halaman ke menu data barang terlebih dahulu
+    bukaMenu('barang');
+    
+    // 2. Kosongkan kolom pencarian teks agar tidak bentrok
+    let inputCari = document.getElementById("cariBarangMaster");
+    let selectKategori = document.getElementById("filterKategoriMaster");
+    if (inputCari) inputCari.value = "";
+    if (selectKategori) selectKategori.value = "Semua";
+
+    // 3. Saring baris tabel berdasarkan kondisi stoknya
+    let tbody = document.getElementById("bodyBarangMaster");
+    if (!tbody) return;
+    
+    let baris = tbody.getElementsByTagName("tr");
+    for (let i = 0; i < baris.length; i++) {
+        let cells = baris[i].getElementsByTagName("td");
+        if (cells.length < 8) continue;
+
+        // Ambil angka stok asli yang berada di dalam badge (kolom ke-8 / indeks 7)
+        let badgeSpan = cells[7].querySelector(".badge");
+        let stok = badgeSpan ? parseInt(badgeSpan.innerText, 10) : 0;
+
+        if (kondisi === 'habis') {
+            // Tampilkan hanya jika stoknya 0 atau kurang
+            baris[i].style.display = (stok <= 0) ? "" : "none";
+        } else if (kondisi === 'hampir_habis') {
+            // Tampilkan hanya jika stoknya di antara 1 sampai 5
+            baris[i].style.display = (stok > 0 && stok <= 5) ? "" : "none";
+        }
+    }
 }
