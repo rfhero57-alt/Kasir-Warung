@@ -804,7 +804,7 @@ function buatStruk() {
     }, 2000);
 }
 //======================================================
-// PHASE 5: MODUL PENGATURAN TOKO & STRUK DINAMIS
+//  5: MODUL PENGATURAN TOKO & STRUK DINAMIS
 //======================================================
 
 // Fungsi memuat data toko saat menu pengaturan dibuka
@@ -1166,152 +1166,6 @@ function hitungTotalLaba() {
     return tl;
 }
 //======================================================
-// PHASE 7: MODUL BARCODE SCANNER KAMERA 
-//======================================================
-
-let scannerKamera = null;
-let sistemSedangMembaca = false; // Pengunci agar tidak terjadi scan ganda dalam 1 detik
-
-// 1. Fungsi menyalakan mesin kamera
-function nyalakanScannerKamera() {
-    let wadahKamera = document.getElementById("reader");
-    if (!wadahKamera) return;
-
-    // Jika mesin scanner sebelumnya masih menggantung, bersihkan dulu
-    if (scannerKamera) {
-        scannerKamera.clear();
-    }
-
-    // Set tampilan teks indikator bawah kamera
-    let statusTxt = document.getElementById("statusScan");
-    if (statusTxt) {
-        statusTxt.innerHTML = "🟢 Kamera Aktif (Dekatkan Barcode Produk)";
-        statusTxt.style.color = "var(--green)";
-    }
-
-    // Inisialisasi konfigurasi Html5QrcodeScanner
-    scannerKamera = new Html5QrcodeScanner("reader", { 
-        fps: 15,                             // Kecepatan membaca frame per detik
-        qrbox: { width: 260, height: 160 },   // Dimensi kotak target barcode di layar
-        aspectRatio: 1.0
-    }, false);
-
-    // Jalankan kamera dan pasang fungsi tangkapan sukses
-    scannerKamera.render(ketikaBarcodeTerbaca, ketikaScanGagal);
-}
-
-// 2. Fungsi eksekusi ketika kamera berhasil mengenali kode barcode
-function ketikaBarcodeTerbaca(decodedText, decodedResult) {
-    if (sistemSedangMembaca) return; // Kunci frame agar tidak duplikasi scan[cite: 3]
-    sistemSedangMembaca = true; //[cite: 3]
-
-    bunyiBipKasir(); // Bunyi cekrek kasir[cite: 3]
-
-    document.getElementById("statusScan").innerHTML = `⚡ Barcode Terbaca: ${decodedText}`; //[cite: 3]
-    document.getElementById("statusScan").style.color = "var(--yellow)"; //[cite: 2, 3]
-
-    let selectElement = document.getElementById("pilihBarang"); //[cite: 3]
-    let ketemu = false; //[cite: 3]
-
-    // 1. TAHAP SATU: Cari di Database Internal Toko Anda Sendiri[cite: 3]
-    for (let i = 1; i < selectElement.options.length; i++) { //[cite: 3]
-        let valueData = selectElement.options[i].value; //[cite: 3]
-        if (valueData === "") continue; //[cite: 3]
-
-        let pecahData = valueData.split("|"); //[cite: 3]
-        let kodeDatabase = pecahData[0]; //[cite: 3]
-
-        if (kodeDatabase === decodedText) { //[cite: 3]
-            selectElement.value = valueData; //[cite: 3]
-            isiBarangOtomatis(); // Masukkan form[cite: 3]
-            tambahBarang(); // Masukkan keranjang belanja[cite: 3]
-            
-            document.getElementById("statusScan").innerHTML = `✅ Masuk Keranjang: ${pecahData[1]}`; //[cite: 3]
-            document.getElementById("statusScan").style.color = "var(--green)"; //[cite: 1, 3]
-            ketemu = true; //[cite: 3]
-            break; //[cite: 3]
-        }
-    }
-// Tambahkan ini di bagian paling bawah file script.js Anda:
-function ketikaScanGagal(error) {
-    // Dibiarkan kosong agar tidak membanjiri tab console browser 
-    // saat kamera sedang berkedip mencari fokus barcode produk
-}
-    // 2. TAHAP DUA: Jika Tidak Ada di Toko, Cari Otomatis ke Kamus 32rb Barcode (Cloud)
-    if (!ketemu) {
-        document.getElementById("statusScan").innerHTML = "🔍 Mencari di Kamus Nasional...";
-        document.getElementById("statusScan").style.color = "var(--muted)"; //[cite: 1]
-        
-        // Fungsi callback penangkap respon dari server Google Sheets
-        window.responKamusBarcode = function(hasil) {
-            if (hasil.ketemu) {
-                // Jika ketemu di Kamus 32rb data, langsung pindah menu dan tembak form modal
-                bukaMenu('barang'); //[cite: 3]
-                bukaModalBarang('tambah'); //[cite: 3]
-                
-                // Isi form otomatis secara instan tanpa ketik!
-                document.getElementById("modalKode").value = decodedText; //
-                document.getElementById("modalNama").value = hasil.nama; //
-                document.getElementById("modalKategori").value = hasil.kategori || "Makanan"; //[cite: 2]
-                
-                document.getElementById("statusScan").innerHTML = `✨ Terdeteksi: ${hasil.nama}`;
-                document.getElementById("statusScan").style.color = "var(--green)"; //[cite: 1]
-                
-                // Fokuskan kursor langsung ke form Harga Jual biar kasir tinggal ketik angka harga saja
-                setTimeout(() => {
-                    document.getElementById("modalHarga").focus(); //[cite: 2]
-                }, 150);
-                
-                alert(`📦 Produk Dikenal!\n"${hasil.nama}" otomatis diinput ke sistem.\n\nSilakan isi Harga Modal, Harga Jual, dan Stok untuk mendaftarkannya di toko Anda.`);
-            } else {
-                // Jika benar-benar asing (tidak ada di kamus juga)
-                let mauDaftar = confirm(`Barcode "${decodedText}" tidak ada di toko maupun kamus nasional.\nMau daftarkan manual dari nol?`);
-                if (mauDaftar) {
-                    bukaMenu('barang'); //[cite: 3]
-                    bukaModalBarang('tambah'); //[cite: 3]
-                    document.getElementById("modalKode").value = decodedText; //[cite: 2]
-                }
-            }
-        };
-
-        // Kirim perintah JSONP aman ke Google Sheets Tab Kamus
-        let scriptLama = document.getElementById("cariKamus");
-        if (scriptLama) scriptLama.remove();
-        
-        let script = document.createElement("script");
-        script.id = "cariKamus";
-        script.src = WEB_APP_URL + `?callback=responKamusBarcode&tipe=cari_kamus_barcode&kode=${decodedText}`; //[cite: 3]
-        document.body.appendChild(script);
-    }
-
-    // Mengunci scanner selama 2 detik sebelum scan item berikutnya[cite: 3]
-    setTimeout(() => {
-        sistemSedangMembaca = false; //[cite: 3]
-        if (document.getElementById("menuKasir").style.display === "block") { //[cite: 3]
-            document.getElementById("statusScan").innerHTML = "🟢 Kamera Aktif (Dekatkan Barcode Produk)"; //[cite: 3]
-            document.getElementById("statusScan").style.color = "var(--green)"; //[cite: 1, 3]
-        }
-    }, 2000);
-}
-
-// 3. Pembuat efek suara digital pendek (Bip!) tanpa aset file eksternal
-function bunyiBipKasir() {
-    try {
-        let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        let osc = audioCtx.createOscillator();
-        let gain = audioCtx.createGain();
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.type = 'sine';
-        osc.frequency.value = 1300; // Frekuensi suara kasir nyaring
-        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.07); // Durasi bunyi pendek
-    } catch (e) {
-        console.log("Audio konteks tertahan keamanan browser.");
-    }
-}
-//======================================================
 // PHASE 3: MODUL LOGIKA DASHBOARD UTAMA
 //======================================================
 function updateDashboard() {
@@ -1360,6 +1214,155 @@ function updateDashboard() {
     elHampirHabis.innerText = jmlHampirHabis;
     elHabis.innerText = jmlHabis;
 }
+//======================================================
+// PHASE 7: MODUL BARCODE SCANNER KAMERA 
+//======================================================
+
+let scannerKamera = null;
+let sistemSedangMembaca = false; // Pengunci agar tidak terjadi scan ganda dalam 1 detik
+
+// 1. Fungsi menyalakan mesin kamera
+function nyalakanScannerKamera() {
+    let wadahKamera = document.getElementById("reader");
+    if (!wadahKamera) return;
+
+    // Jika mesin scanner sebelumnya masih menggantung, bersihkan dulu
+    if (scannerKamera) {
+        scannerKamera.clear().catch(err => console.log("Gagal membersihkan scanner lama:", err));
+    }
+
+    // Set tampilan teks indikator bawah kamera
+    let statusTxt = document.getElementById("statusScan");
+    if (statusTxt) {
+        statusTxt.innerHTML = "🟢 Kamera Aktif (Dekatkan Barcode Produk)";
+        statusTxt.style.color = "var(--green)";
+    }
+
+    // Inisialisasi konfigurasi Html5QrcodeScanner
+    scannerKamera = new Html5QrcodeScanner("reader", { 
+        fps: 15,                               // Kecepatan membaca frame per detik
+        qrbox: { width: 260, height: 160 },   // Dimensi kotak target barcode di layar
+        aspectRatio: 1.0
+    }, false);
+
+    // Jalankan kamera dan pasang fungsi tangkapan sukses & gagal
+    scannerKamera.render(ketikaBarcodeTerbaca, ketikaScanGagal);
+}
+
+// 2. Fungsi eksekusi ketika kamera berhasil mengenali kode barcode
+function ketikaBarcodeTerbaca(decodedText, decodedResult) {
+    if (sistemSedangMembaca) return; // Kunci frame agar tidak duplikasi scan
+    sistemSedangMembaca = true; 
+
+    bunyiBipKasir(); // Bunyi cekrek kasir
+
+    document.getElementById("statusScan").innerHTML = `⚡ Barcode Terbaca: ${decodedText}`; 
+    document.getElementById("statusScan").style.color = "var(--yellow)"; 
+
+    let selectElement = document.getElementById("pilihBarang"); 
+    let ketemu = false; 
+
+    // 1. TAHAP SATU: Cari di Database Internal Toko Anda Sendiri
+    for (let i = 1; i < selectElement.options.length; i++) { 
+        let valueData = selectElement.options[i].value; 
+        if (valueData === "") continue; 
+
+        let pecahData = valueData.split("|"); 
+        let kodeDatabase = pecahData[0]; 
+
+        if (kodeDatabase === decodedText) { 
+            selectElement.value = valueData; 
+            isiBarangOtomatis(); // Masukkan form
+            tambahBarang(); // Masukkan keranjang belanja
+            
+            document.getElementById("statusScan").innerHTML = `✅ Masuk Keranjang: ${pecahData[1]}`; 
+            document.getElementById("statusScan").style.color = "var(--green)"; 
+            ketemu = true; 
+            break; 
+        }
+    }
+
+    // 2. TAHAP DUA: Jika Tidak Ada di Toko, Cari Otomatis ke Kamus 32rb Barcode (Cloud)
+    if (!ketemu) {
+        document.getElementById("statusScan").innerHTML = "🔍 Mencari di Kamus Nasional...";
+        document.getElementById("statusScan").style.color = "var(--muted)"; 
+        
+        // Fungsi callback penangkap respon dari server Google Sheets
+        window.responKamusBarcode = function(hasil) {
+            if (hasil.ketemu) {
+                // Jika ketemu di Kamus 32rb data, langsung pindah menu dan tembak form modal
+                bukaMenu('barang'); 
+                bukaModalBarang('tambah'); 
+                
+                // Isi form otomatis secara instan tanpa ketik!
+                document.getElementById("modalKode").value = decodedText; 
+                document.getElementById("modalNama").value = hasil.nama; 
+                document.getElementById("modalKategori").value = hasil.kategori || "Makanan"; 
+                
+                document.getElementById("statusScan").innerHTML = `✨ Terdeteksi: ${hasil.nama}`;
+                document.getElementById("statusScan").style.color = "var(--green)"; 
+                
+                // Fokuskan kursor langsung ke form Harga Jual biar kasir tinggal ketik angka harga saja
+                setTimeout(() => {
+                    document.getElementById("modalHarga").focus(); 
+                }, 150);
+                
+                alert(`📦 Produk Dikenal!\n"${hasil.nama}" otomatis diinput ke sistem.\n\nSilakan isi Harga Modal, Harga Jual, dan Stok untuk mendaftarkannya di toko Anda.`);
+            } else {
+                // Jika benar-benar asing (tidak ada di kamus juga)
+                let mauDaftar = confirm(`Barcode "${decodedText}" tidak ada di toko maupun kamus nasional.\nMau daftarkan manual dari nol?`);
+                if (mauDaftar) {
+                    bukaMenu('barang'); 
+                    bukaModalBarang('tambah'); 
+                    document.getElementById("modalKode").value = decodedText; 
+                }
+            }
+        };
+
+        // Kirim perintah JSONP aman ke Google Sheets Tab Kamus
+        let scriptLama = document.getElementById("cariKamus");
+        if (scriptLama) scriptLama.remove();
+        
+        let script = document.createElement("script");
+        script.id = "cariKamus";
+        script.src = WEB_APP_URL + `?callback=responKamusBarcode&tipe=cari_kamus_barcode&kode=${decodedText}`; 
+        document.body.appendChild(script);
+    }
+
+    // Mengunci scanner selama 2 detik sebelum scan item berikutnya
+    setTimeout(() => {
+        sistemSedangMembaca = false; 
+        if (document.getElementById("menuKasir").style.display === "block") { 
+            document.getElementById("statusScan").innerHTML = "🟢 Kamera Aktif (Dekatkan Barcode Produk)"; 
+            document.getElementById("statusScan").style.color = "var(--green)"; 
+        }
+    }, 2000);
+}
+
+// 3. Fungsi penanganan ketika scan gagal / sedang mencari fokus
+function ketikaScanGagal(error) {
+    // Dibiarkan kosong agar tidak membanjiri tab console browser 
+    // saat kamera sedang berkedip mencari fokus barcode produk
+}
+
+// 4. Pembuat efek suara digital pendek (Bip!) tanpa aset file eksternal
+function bunyiBipKasir() {
+    try {
+        let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.type = 'sine';
+        osc.frequency.value = 1300; // Frekuensi suara kasir nyaring
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.07); // Durasi bunyi pendek
+    } catch (e) {
+        console.log("Audio konteks tertahan keamanan browser.");
+    }
+}
+
 //======================================================
 // INTERAKSI DASHBOARD KE MASTER BARANG
 //======================================================
