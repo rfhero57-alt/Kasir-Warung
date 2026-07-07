@@ -1232,7 +1232,11 @@ function ketikaBarcodeTerbaca(decodedText, decodedResult) {
             break; //[cite: 3]
         }
     }
-
+// Tambahkan ini di bagian paling bawah file script.js Anda:
+function ketikaScanGagal(error) {
+    // Dibiarkan kosong agar tidak membanjiri tab console browser 
+    // saat kamera sedang berkedip mencari fokus barcode produk
+}
     // 2. TAHAP DUA: Jika Tidak Ada di Toko, Cari Otomatis ke Kamus 32rb Barcode (Cloud)
     if (!ketemu) {
         document.getElementById("statusScan").innerHTML = "🔍 Mencari di Kamus Nasional...";
