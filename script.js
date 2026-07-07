@@ -129,7 +129,7 @@ function transaksiBaru() {
     document.getElementById("totalBelanja").innerHTML = "Total Belanja: Rp 0";
     document.getElementById("uangBayar").value = "";
     document.getElementById("hasilKembalian").innerHTML = "Kembalian: Rp 0";
-    document.getElementById("").innerHTML = "Belum ada .";
+    document.getElementById("struk").innerHTML = "Belum ada struk.";
 
     kosongkanInputBarang();
     bukaInputTransaksi();
@@ -826,9 +826,13 @@ function simpanPengaturanToko() {
     localStorage.setItem("setAlamatToko", alamat);
     localStorage.setItem("setTelpToko", telp);
     localStorage.setItem("setKakiStruk", footer);
-
+    if(document.getElementById("namaTokoDashboard")) {
+        document.getElementById("namaTokoDashboard").innerText = nama.toUpperCase();
+    }
+    
     alert("✅ Profil warung berhasil diperbarui!");
-    updateDashboard();
+    updateDashboard(); //[cite: 3]
+
 }
 
 // Pemicu otomatis memuat data saat halaman dimuat pertama kali
@@ -837,11 +841,11 @@ window.onload = function() {
     if (onloadLama) onloadLama();
     // Pastikan data default langsung tersimpan jika cache masih kosong
     if (!localStorage.getItem("setNamaToko")) {
-        localStorage.setItem("setNamaToko", "WARUNG BAROKAH TANJUNG");
-        localStorage.setItem("setAlamatToko", "Alamat Toko");
-        localStorage.setItem("setTelpToko", "-");
-        localStorage.setItem("setKakiStruk", "Terima Kasih");
-    }
+    localStorage.setItem("setNamaToko", "WARUNG BAROKAH TANJUNG");
+    localStorage.setItem("setAlamatToko", "Jln Nelayan RT1 Tanjung Harapan");
+    localStorage.setItem("setTelpToko", "0812-5333-3996");
+    localStorage.setItem("setKakiStruk", "Terima Kasih, Selamat Belanja Kembali");
+}
 };
 
 //======================================================
@@ -1278,4 +1282,53 @@ function bunyiBipKasir() {
     } catch (e) {
         console.log("Audio konteks tertahan keamanan browser.");
     }
+}
+//======================================================
+// PHASE 3: MODUL LOGIKA DASHBOARD UTAMA
+//======================================================
+function updateDashboard() {
+    let elOmzet = document.getElementById("dashOmzet");
+    let elLaba = document.getElementById("dashLaba");
+    let elTransaksi = document.getElementById("dashTransaksi");
+    let elHampirHabis = document.getElementById("dashHampirHabis");
+    let elHabis = document.getElementById("dashHabis");
+
+    // Pastikan elemen dashboard ada di HTML sebelum diisi
+    if (!elOmzet) return; 
+
+    let hariIni = new Date().toLocaleDateString("id-ID");
+    let totalOmzet = 0;
+    let totalLaba = 0;
+    let totalTransaksi = 0;
+
+    // 1. Hitung Rekap Transaksi Hari Ini berdasarkan Cache Riwayat Cloud
+    let riwayatData = JSON.parse(localStorage.getItem("cacheDataRiwayat")) || [];
+    riwayatData.forEach(function(t) {
+        if (t.tanggal && t.tanggal.includes(hariIni)) {
+            totalTransaksi++;
+            totalOmzet += Number(t.total || 0);
+            totalLaba += Number(t.totalLaba || 0);
+        }
+    });
+
+    // 2. Hitung Status Stok Barang berdasarkan Cache Data Barang
+    let jmlHampirHabis = 0;
+    let jmlHabis = 0;
+    
+    let barangData = JSON.parse(localStorage.getItem("cacheDataBarang")) || [];
+    barangData.forEach(function(b) {
+        let stok = Number(b.stok || 0);
+        if (stok <= 0) {
+            jmlHabis++;
+        } else if (stok <= 5) {
+            jmlHampirHabis++;
+        }
+    });
+
+    // 3. Tampilkan Hasil Hitungan ke Layar Dashboard Utama
+    elOmzet.innerText = formatRupiah(totalOmzet);
+    elLaba.innerText = formatRupiah(totalLaba);
+    elTransaksi.innerText = totalTransaksi;
+    elHampirHabis.innerText = jmlHampirHabis;
+    elHabis.innerText = jmlHabis;
 }
