@@ -16,7 +16,7 @@ let riwayatTransaksi = [];
 let grafikLaporan = null; // Variabel grafik
 
 //======================================================
-// 2. INISIALISASI SAAT APLIKASI DIBUKA
+// 2. INISIALISASI SAAT APLIKASI DIBUKA 
 //======================================================
 
 window.onload = function () {
