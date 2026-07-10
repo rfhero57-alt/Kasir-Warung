@@ -202,6 +202,11 @@ function kurangiItem(index) {
 
 function tambahItem(index) {
     let item = daftarItem[index];
+    if (item.stok !== "" && item.stok !== undefined && item.jumlah + 1 > Number(item.stok)) {
+        alert("Stok tidak mencukupi. Sisa stok: " + item.stok);
+        return;
+    }
+
     item.jumlah++;
     item.subtotal = item.harga * item.jumlah;
     item.laba = (item.modal > 0) ? (item.harga - item.modal) * item.jumlah : 0;
@@ -477,6 +482,9 @@ function tampilkanDataBarang() {
     tbody.innerHTML = "";
 
     dataBarang.forEach(function(barang, index) {
+        let kode = barang.kode || "";
+        let nama = barang.nama || "";
+        let kategori = barang.kategori || "Lainnya";
         let modal = Number(barang.modal) || 0;
         let harga = Number(barang.harga) || 0;
         let laba = (modal > 0) ? (harga - modal) : 0;
@@ -491,21 +499,30 @@ function tampilkanDataBarang() {
         let tr = document.createElement("tr");
         tr.innerHTML = `
             <td style="text-align: center;">${index + 1}</td>
-            <td>${barang.kode || '-'}</td>
-            <td title="${barang.nama}">${barang.nama}</td>
-            <td>${barang.kategori || 'Lainnya'}</td>
+            <td>${escapeHTML(kode || '-')}</td>
+            <td title="${escapeHTML(nama)}">${escapeHTML(nama)}</td>
+            <td>${escapeHTML(kategori)}</td>
             <td style="color: var(--muted);">${formatRupiah(modal)}</td>
             <td style="font-weight: bold;">${formatRupiah(harga)}</td>
             <td style="color: var(--green-dark); font-weight: bold;">${teksLaba}</td>
             <td style="text-align: center;"><span class="badge ${badgeClass}">${stok}</span></td>
             <td>
                 <div class="action-buttons-cell">
-                    <button class="btn-mini btn-mini-edit" onclick="bukaModalEdit('${barang.kode}', '${barang.nama}', ${modal}, ${harga}, '${barang.kategori}')" title="Edit Barang">📝</button>
-                    <button class="btn-mini btn-mini-stok" onclick="bukaModalStok('${barang.kode}', '${barang.nama}')" title="Tambah Stok">📦</button>
-                    <button class="btn-mini btn-mini-hapus" onclick="bukaModalHapus('${barang.kode}', '${barang.nama}')" title="Hapus Barang">🗑️</button>
+                    <button class="btn-mini btn-mini-edit" type="button" title="Edit Barang">Edit</button>
+                    <button class="btn-mini btn-mini-stok" type="button" title="Tambah Stok">Stok</button>
+                    <button class="btn-mini btn-mini-hapus" type="button" title="Hapus Barang">Hapus</button>
                 </div>
             </td>
         `;
+        tr.querySelector(".btn-mini-edit").addEventListener("click", function() {
+            bukaModalEdit(kode, nama, modal, harga, kategori);
+        });
+        tr.querySelector(".btn-mini-stok").addEventListener("click", function() {
+            bukaModalStok(kode, nama);
+        });
+        tr.querySelector(".btn-mini-hapus").addEventListener("click", function() {
+            bukaModalHapus(kode, nama);
+        });
         tbody.appendChild(tr);
     });
 }
@@ -605,7 +622,7 @@ function bukaModalEdit(kode, nama, modalLama, hargaLama, kategoriLama) {
 function bukaModalStok(kode, nama) {
     document.getElementById("modalTitleGeneral").innerText = "Tambah Stok";
     document.getElementById("modalBody").innerHTML = `
-        <p>Barang: <strong>${nama}</strong></p>
+        <p>Barang: <strong>${escapeHTML(nama)}</strong></p>
         <div class="filter-group">
             <label>Jumlah Penambahan Stok</label>
             <input type="number" id="modTambahStok" placeholder="Contoh: 10">
@@ -613,8 +630,11 @@ function bukaModalStok(kode, nama) {
     `;
     document.getElementById("modalFooter").innerHTML = `
         <button class="secondary-button" onclick="tutupModal()">Batal</button>
-        <button onclick="eksekusiTambahStok('${kode}', '${nama}')">Simpan Stok</button>
+        <button id="btnSimpanStokModal" type="button">Simpan Stok</button>
     `;
+    document.getElementById("btnSimpanStokModal").addEventListener("click", function() {
+        eksekusiTambahStok(kode, nama);
+    });
     document.getElementById("modalOverlay").style.display = "flex";
 }
 
@@ -650,6 +670,49 @@ function eksekusiTambahStok(kode, nama) {
         if(elStatus) elStatus.classList.remove("show");
     });
 }
+
+function bukaModalHapus(kode, nama) {
+    document.getElementById("modalTitleGeneral").innerText = "Hapus Barang";
+    document.getElementById("modalBody").innerHTML = `
+        <p>Yakin ingin menghapus <strong>${escapeHTML(nama)}</strong> dari data barang?</p>
+    `;
+    document.getElementById("modalFooter").innerHTML = `
+        <button class="secondary-button" onclick="tutupModal()">Batal</button>
+        <button class="danger-button" id="btnHapusBarangModal" type="button">Hapus</button>
+    `;
+    document.getElementById("btnHapusBarangModal").addEventListener("click", function() {
+        eksekusiHapusBarang(kode, nama);
+    });
+    document.getElementById("modalOverlay").style.display = "flex";
+}
+
+function eksekusiHapusBarang(kode, nama) {
+    tutupModal();
+
+    let elStatus = document.getElementById("statusSinkron");
+    if (elStatus) {
+        elStatus.innerHTML = "Menghapus barang...";
+        elStatus.classList.add("show", "loading");
+    }
+
+    fetch(WEB_APP_URL, {
+        method: "POST",
+        mode: "no-cors",
+        body: JSON.stringify({
+            tipe: "hapus_barang",
+            kode: kode,
+            nama: nama
+        })
+    })
+    .then(() => {
+        setTimeout(ambilBarangDariSheet, 2000);
+    })
+    .catch(err => {
+        console.error("Gagal hapus barang:", err);
+        if(elStatus) elStatus.classList.remove("show");
+    });
+}
+
 function tambahStokKeSheet() {
     let inputNama = document.getElementById("namaBarang");
     let kode = inputNama.getAttribute("data-kode") || "";
@@ -933,7 +996,12 @@ function setFilterCepat(tipe) {
     let tglAkhir = document.getElementById("lapTanggalAkhir");
     let hariIni = new Date();
     
-    const formatDate = (dateObj) => dateObj.toISOString().split('T')[0];
+    const formatDate = (dateObj) => {
+        const tahun = dateObj.getFullYear();
+        const bulan = String(dateObj.getMonth() + 1).padStart(2, "0");
+        const tanggal = String(dateObj.getDate()).padStart(2, "0");
+        return `${tahun}-${bulan}-${tanggal}`;
+    };
 
     if (tipe === 'semua') {
         tglAwal.value = "";
@@ -1143,6 +1211,18 @@ function formatRupiah(angka) {
     return "Rp " + (Number(angka) || 0).toLocaleString("id-ID");
 }
 
+function escapeHTML(teks) {
+    return String(teks ?? "").replace(/[&<>"']/g, function(karakter) {
+        return {
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;"
+        }[karakter];
+    });
+}
+
 function tampilkanTanggal() {
     let el = document.getElementById("tanggalTransaksi");
     if(el) el.innerHTML = new Date().toLocaleString("id-ID");
@@ -1164,8 +1244,8 @@ function updateDashboard() {
     let elOmzet = document.getElementById("dashOmzet");
     let elLaba = document.getElementById("dashLaba");
     let elTransaksi = document.getElementById("dashTransaksi");
-    let elHampirHabis = document.getElementById("dashHampirHabis");
-    let elHabis = document.getElementById("dashHabis");
+    let elemenHampirHabis = document.querySelectorAll("#dashHampirHabis");
+    let elemenHabis = document.querySelectorAll("#dashHabis");
 
     // Pastikan elemen dashboard ada di HTML sebelum diisi
     if (!elOmzet) return; 
@@ -1203,8 +1283,8 @@ function updateDashboard() {
     elOmzet.innerText = formatRupiah(totalOmzet);
     elLaba.innerText = formatRupiah(totalLaba);
     elTransaksi.innerText = totalTransaksi;
-    elHampirHabis.innerText = jmlHampirHabis;
-    elHabis.innerText = jmlHabis;
+    elemenHampirHabis.forEach(el => el.innerText = jmlHampirHabis);
+    elemenHabis.forEach(el => el.innerText = jmlHabis);
 }
 //======================================================
 // PHASE 7: MODUL BARCODE SCANNER KAMERA 
@@ -1317,7 +1397,7 @@ function ketikaBarcodeTerbaca(decodedText, decodedResult) {
         
         let script = document.createElement("script");
         script.id = "cariKamus";
-        script.src = WEB_APP_URL + `?callback=responKamusBarcode&tipe=cari_kamus_barcode&kode=${decodedText}`; 
+        script.src = WEB_APP_URL + `?callback=responKamusBarcode&tipe=cari_kamus_barcode&kode=${encodeURIComponent(decodedText)}`; 
         document.body.appendChild(script);
     }
 
