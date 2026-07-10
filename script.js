@@ -313,7 +313,28 @@ function tambahBarang() {
 //======================================================
 // 6. MASTER BARANG (SINKRONISASI GOOGLE SHEETS)
 //======================================================
+// Fungsi untuk kolom pencarian di menu Data Barang
+function filterBarangMaster() {
+    let keyword = document.getElementById("cariBarangMaster").value.toLowerCase().trim();
+    let kategori = document.getElementById("filterKategoriMaster").value;
+    let tbody = document.getElementById("bodyBarangMaster");
+    if (!tbody) return;
+    
+    let baris = tbody.getElementsByTagName("tr");
+    for (let i = 0; i < baris.length; i++) {
+        let cells = baris[i].getElementsByTagName("td");
+        if (cells.length < 4) continue;
 
+        let txtKode = cells[1].innerText.toLowerCase();
+        let txtNama = cells[2].innerText.toLowerCase();
+        let txtKategori = cells[3].innerText; 
+
+        let cocokKeyword = txtKode.includes(keyword) || txtNama.includes(keyword);
+        let cocokKategori = (kategori === "Semua" || txtKategori === kategori);
+
+        baris[i].style.display = (cocokKeyword && cocokKategori) ? "" : "none";
+    }
+}
 function ambilBarangDariSheet() {
     let elStatus = document.getElementById("statusSinkron");
     if (elStatus) {
