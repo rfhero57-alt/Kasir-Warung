@@ -16,7 +16,7 @@ let riwayatTransaksi = [];
 let grafikLaporan = null; // Variabel grafik
 
 //======================================================
-// 2. INISIALISASI SAAT APLIKASI DIBUKA 
+// 2. INISIALISASI SAAT APLIKASI DIBUKA
 //======================================================
 
 window.onload = function () {
@@ -52,6 +52,10 @@ window.onload = function () {
 // 3. NAVIGASI MENU
 //======================================================
 
+//======================================================
+// 3. NAVIGASI MENU
+//======================================================
+
 function bukaMenu(menu) {
     // Sembunyikan semua menu terlebih dahulu
     let dashboard = document.getElementById("menuDashboard");
@@ -74,8 +78,8 @@ function bukaMenu(menu) {
     }
     else if (menu == "kasir") {
         document.getElementById("menuKasir").style.display = "block";
-        // 🔌 SAKLAR ON: Otomatis nyalakan kamera saat masuk menu kasir (diberi jeda mikro 100ms agar DOM siap)
-        setTimeout(nyalakanScannerKamera, 100);
+        // 🔌 SAKLAR ON: Otomatis nyalakan kamera saat masuk menu kasir
+       //setTimeout(nyalakanScannerKamera, 100);
     }
     else if (menu == "barang") {
         document.getElementById("menuBarang").style.display = "block";
@@ -85,13 +89,11 @@ function bukaMenu(menu) {
         document.getElementById("menuLaporan").style.display = "block";
         inisialisasiLaporan();
     }
-   // ... (kode atas fungsi bukaMenu tetap sama) ...
     else if (menu == "pengaturan") {
         document.getElementById("menuPengaturan").style.display = "block";
-        muatPengaturanToko(); // ⚡ Panggil fungsi pengisi form otomatis di sini
+        muatPengaturanToko(); 
     }
-
-}
+} // <-- Sekarang kurung penutup sudah pas dan rapi
 
 //======================================================
 // 5. TRANSAKSI KASIR
@@ -606,64 +608,27 @@ function eksekusiTambahStok(kode, nama) {
         elStatus.classList.add("show", "loading");
     }
     
-    window.responTambahStok = function(respons) { ambilBarangDariSheet(); };
+    // Menggunakan metode POST agar cocok dengan Apps Script baru
+    let payload = {
+        tipe: "tambah_stok",
+        kode: kode,
+        nama: nama,
+        jumlahTambah: jumlah
+    };
 
-    let scriptLama = document.getElementById("kirimStokMaster");
-    if (scriptLama) scriptLama.remove();
-    let url = WEB_APP_URL + `?callback=responTambahStok&tipe=tambah_stok&kode=${encodeURIComponent(kode)}&nama=${encodeURIComponent(nama)}&jumlahTambah=${jumlah}`;
-    let script = document.createElement("script");
-    script.id = "kirimStokMaster";
-    script.src = url;
-    document.body.appendChild(script);
+    fetch(WEB_APP_URL, {
+        method: "POST",
+        mode: "no-cors",
+        body: JSON.stringify(payload)
+    })
+    .then(() => {
+        setTimeout(ambilBarangDariSheet, 2000);
+    })
+    .catch(err => {
+        console.error("Gagal tambah stok:", err);
+        if(elStatus) elStatus.classList.remove("show");
+    });
 }
-
-function bukaModalHapus(kode, nama) {
-    document.getElementById("modalTitleGeneral").innerText = "Hapus Barang";
-    document.getElementById("modalBody").innerHTML = `
-        <p>Apakah Anda yakin ingin menghapus <strong>${nama}</strong> dari database?</p>
-        <p style="color: var(--red); font-size: 13px; margin-top:5px;">⚠️ Peringatan: Tindakan ini tidak dapat dibatalkan.</p>
-    `;
-    document.getElementById("modalFooter").innerHTML = `
-        <button class="secondary-button" onclick="tutupModal()">Batal</button>
-        <button class="danger-button" onclick="eksekusiHapus('${kode}')">Ya, Hapus</button>
-    `;
-    document.getElementById("modalOverlay").style.display = "flex";
-}
-
-function eksekusiHapus(kode) {
-    tutupModal();
-    let elStatus = document.getElementById("statusSinkron");
-    if (elStatus) {
-        elStatus.innerHTML = "⏳ Memproses data...";
-        elStatus.classList.add("show", "loading");
-    }
-    fetch(WEB_APP_URL, { method: "POST", mode: "no-cors", body: JSON.stringify({ tipe: "remove_barang", kode: kode }) });
-    setTimeout(ambilBarangDariSheet, 2000);
-}
-
-// [BUG FIX 3] Memperbaiki target pencarian index cell pencarian barang master
-function filterBarangMaster() {
-    let keyword = document.getElementById("cariBarangMaster").value.toLowerCase().trim();
-    let kategori = document.getElementById("filterKategoriMaster").value;
-    let tbody = document.getElementById("bodyBarangMaster");
-    if (!tbody) return;
-    
-    let baris = tbody.getElementsByTagName("tr");
-    for (let i = 0; i < baris.length; i++) {
-        let cells = baris[i].getElementsByTagName("td");
-        if (cells.length < 4) continue;
-
-        let txtKode = cells[1].innerText.toLowerCase();
-        let txtNama = cells[2].innerText.toLowerCase();
-        let txtKategori = cells[3].innerText; 
-
-        let cocokKeyword = txtKode.includes(keyword) || txtNama.includes(keyword);
-        let cocokKategori = (kategori === "Semua" || txtKategori === kategori);
-
-        baris[i].style.display = (cocokKeyword && cocokKategori) ? "" : "none";
-    }
-}
-
 function tambahStokKeSheet() {
     let inputNama = document.getElementById("namaBarang");
     let kode = inputNama.getAttribute("data-kode") || "";
@@ -679,21 +644,27 @@ function tambahStokKeSheet() {
         elStatus.classList.add("show", "loading");
     }
 
-    window.responTambahStok = function(respons) {
-        alert(`Berhasil menambah stok sebanyak ${jumlah} untuk ${nama}.`);
-        ambilBarangDariSheet();
+    let payload = {
+        tipe: "tambah_stok",
+        kode: kode,
+        nama: nama,
+        jumlahTambah: jumlah
     };
 
-    let scriptLama = document.getElementById("kirimStokMaster");
-    if (scriptLama) scriptLama.remove();
-
-    let url = WEB_APP_URL + `?callback=responTambahStok&tipe=tambah_stok&kode=${encodeURIComponent(kode)}&nama=${encodeURIComponent(nama)}&jumlahTambah=${jumlah}`;
-    let script = document.createElement("script");
-    script.id = "kirimStokMaster";
-    script.src = url;
-    document.body.appendChild(script);
-    
-    document.getElementById("tambahStokBarang").value = "";
+    fetch(WEB_APP_URL, {
+        method: "POST",
+        mode: "no-cors",
+        body: JSON.stringify(payload)
+    })
+    .then(() => {
+        alert(`Berhasil menambah stok sebanyak ${jumlah} untuk ${nama}.`);
+        document.getElementById("tambahStokBarang").value = "";
+        setTimeout(ambilBarangDariSheet, 2000);
+    })
+    .catch(err => {
+        console.error("Gagal tambah stok:", err);
+        if(elStatus) elStatus.classList.remove("show");
+    });
 }
 
 //======================================================
