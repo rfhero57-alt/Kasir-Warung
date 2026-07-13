@@ -940,23 +940,152 @@ function tampilkanRiwayat() {
     tempat.innerHTML = "";
 
     riwayatTransaksi.forEach(function(t, index) {
-        let jumlahItem = 0;
-        if (t.daftar && t.daftar.trim() !== "") {
-            jumlahItem = t.daftar.trim().split('\n').length;
-        }
-
-        let baris = `
-        <tr>
+        let jumlahItem = hitungJumlahItemRiwayat(t);
+        let baris = document.createElement("tr");
+        baris.className = "riwayat-row";
+        baris.title = "Klik untuk melihat detail transaksi";
+        baris.innerHTML = `
             <td style="text-align: center;">${index + 1}</td>
-            <td>${t.tanggal}</td>
-            <td>${t.kasir}</td>
+            <td>${escapeHTML(t.tanggal || "-")}</td>
+            <td>${escapeHTML(t.kasir || "-")}</td>
             <td style="text-align: center;">${jumlahItem}</td>
             <td>${formatRupiah(t.total)}</td>
             <td style="color: #146b5c; font-weight: bold;">${formatRupiah(t.totalLaba || 0)}</td>
-        </tr>
+            <td style="text-align: center;"><button class="btn-mini secondary-button" type="button">Detail</button></td>
         `;
-        tempat.innerHTML += baris;
+        baris.addEventListener("click", function() {
+            bukaDetailTransaksi(index);
+        });
+        tempat.appendChild(baris);
     });
+}
+
+function hitungJumlahItemRiwayat(t) {
+    let items = ambilItemsRiwayat(t);
+    if (items.length > 0) {
+        return items.reduce((jumlah, item) => jumlah + Number(item.jumlah || 0), 0);
+    }
+
+    if (!t.daftar || t.daftar.trim() === "") return 0;
+    return t.daftar
+        .split("\n")
+        .filter(baris => baris.trim() !== "" && !baris.trim().match(/^\d+\s*x\s/i))
+        .length;
+}
+
+function ambilItemsRiwayat(t) {
+    if (Array.isArray(t.items)) return t.items;
+    if (typeof t.items === "string" && t.items.trim() !== "") {
+        try {
+            let hasil = JSON.parse(t.items);
+            return Array.isArray(hasil) ? hasil : [];
+        } catch (e) {
+            return [];
+        }
+    }
+    return [];
+}
+
+function bukaDetailTransaksi(index) {
+    let transaksi = riwayatTransaksi[index];
+    if (!transaksi) return;
+
+    document.getElementById("modalTitleGeneral").innerText = "Detail Transaksi";
+    document.getElementById("modalBody").innerHTML = buatHTMLDetailTransaksi(transaksi);
+    document.getElementById("modalFooter").innerHTML = `
+        <button class="secondary-button" onclick="tutupModal()">Tutup</button>
+        <button id="btnCetakUlangStruk" type="button">Cetak Ulang Struk</button>
+    `;
+    document.getElementById("btnCetakUlangStruk").addEventListener("click", function() {
+        cetakUlangStruk(index);
+    });
+    document.getElementById("modalOverlay").style.display = "flex";
+}
+
+function buatHTMLDetailTransaksi(t) {
+    let daftarHTML = "";
+    let items = ambilItemsRiwayat(t);
+
+    if (items.length > 0) {
+        daftarHTML = `
+            <div class="detail-items">
+                ${items.map(item => `
+                    <div class="detail-item-row">
+                        <strong>${escapeHTML(item.nama || "-")}</strong>
+                        <span>${Number(item.jumlah || 0)} x ${formatRupiah(item.harga)} = ${formatRupiah(item.subtotal)}</span>
+                    </div>
+                `).join("")}
+            </div>
+        `;
+    } else {
+        daftarHTML = `<pre class="detail-pre">${escapeHTML(t.daftar || "Rincian barang tidak tersedia.")}</pre>`;
+    }
+
+    return `
+        <div class="detail-transaksi">
+            <div class="detail-grid">
+                <div><span>Tanggal</span><strong>${escapeHTML(t.tanggal || "-")}</strong></div>
+                <div><span>Kasir</span><strong>${escapeHTML(t.kasir || "-")}</strong></div>
+                <div><span>Total</span><strong>${formatRupiah(t.total)}</strong></div>
+                <div><span>Laba</span><strong>${formatRupiah(t.totalLaba || 0)}</strong></div>
+                <div><span>Uang Bayar</span><strong>${formatRupiah(t.bayar || 0)}</strong></div>
+                <div><span>Kembalian</span><strong>${formatRupiah(t.kembalian || 0)}</strong></div>
+            </div>
+            ${t.token ? `<p class="detail-token"><strong>Token/Catatan:</strong> ${escapeHTML(t.token)}</p>` : ""}
+            <h3>Rincian Barang</h3>
+            ${daftarHTML}
+        </div>
+    `;
+}
+
+function susunStrukDariRiwayat(t) {
+    let namaToko = localStorage.getItem("setNamaToko") || "WARUNG BAROKAH TANJUNG";
+    let alamatToko = localStorage.getItem("setAlamatToko") || "";
+    let telpToko = localStorage.getItem("setTelpToko") || "";
+    let footerToko = localStorage.getItem("setKakiStruk") || "Terima Kasih";
+    let daftar = t.daftar || "";
+    let items = ambilItemsRiwayat(t);
+
+    if ((!daftar || daftar.trim() === "") && items.length > 0) {
+        daftar = items.map(item => {
+            return `${item.nama}\n  ${Number(item.jumlah || 0)} x ${formatRupiah(item.harga)} = ${formatRupiah(item.subtotal)}`;
+        }).join("\n");
+        if (daftar) daftar += "\n";
+    }
+
+    let barisToken = "";
+    if (t.token) {
+        barisToken = `--------------------------------\n` +
+                     `NOMOR TOKEN PLN / VOUCHER:\n` +
+                     `${t.token}\n`;
+    }
+
+    return `${namaToko}\n` +
+        `${alamatToko}\n` +
+        `Telp: ${telpToko}\n` +
+        `--------------------------------\n` +
+        `STRUK CETAK ULANG\n` +
+        `Tgl: ${t.tanggal || "-"}\n` +
+        `Kasir: ${t.kasir || "-"}\n` +
+        `--------------------------------\n` +
+        daftar +
+        `--------------------------------\n` +
+        `TOTAL     : ${formatRupiah(t.total)}\n` +
+        `BAYAR     : ${formatRupiah(t.bayar || 0)}\n` +
+        `KEMBALIAN : ${formatRupiah(t.kembalian || 0)}\n` +
+        barisToken +
+        `--------------------------------\n` +
+        `${footerToko}\n`;
+}
+
+function cetakUlangStruk(index) {
+    let transaksi = riwayatTransaksi[index];
+    if (!transaksi) return;
+
+    document.getElementById("struk").innerText = susunStrukDariRiwayat(transaksi);
+    document.getElementById("tombolPrint").disabled = false;
+    tutupModal();
+    setTimeout(() => window.print(), 150);
 }
 
 function hapusRiwayat() {
