@@ -14,6 +14,9 @@ let kasir = "";
 let nomorTransaksi = 1; 
 let riwayatTransaksi = []; 
 let grafikLaporan = null; // Variabel grafik
+let favoritBarang = [];
+let catatanUtang = [];
+let transaksiDibatalkan = [];
 
 //======================================================
 // 2. INISIALISASI SAAT APLIKASI DIBUKA
@@ -22,6 +25,10 @@ let grafikLaporan = null; // Variabel grafik
 window.onload = function () {
     tampilkanTanggal();
     ambilNamaKasir();
+    muatFavoritBarang();
+    muatCatatanUtang();
+    muatTransaksiDibatalkan();
+    pasangShortcutKasir();
     
     // ⚡ Memuat Cache Barang agar langsung tampil (Instan)
     let cacheBarang = localStorage.getItem("cacheDataBarang");
@@ -92,6 +99,7 @@ function bukaMenu(menu) {
     else if (menu == "pengaturan") {
         document.getElementById("menuPengaturan").style.display = "block";
         muatPengaturanToko(); 
+        renderDaftarUtang();
     }
 } // <-- Sekarang kurung penutup sudah pas dan rapi
 
@@ -132,6 +140,8 @@ function transaksiBaru() {
     document.getElementById("uangBayar").value = "";
     document.getElementById("hasilKembalian").innerHTML = "Kembalian: Rp 0";
     document.getElementById("struk").innerHTML = "Belum ada struk.";
+    if (document.getElementById("metodePembayaran")) document.getElementById("metodePembayaran").value = "tunai";
+    ubahMetodePembayaran();
 
     kosongkanInputBarang();
     bukaInputTransaksi();
@@ -385,6 +395,7 @@ function isiDropdownDanTabel(data) {
     });
 
     buatDatalistBarang();
+    renderFavoritBarang();
     
     if(document.getElementById("menuBarang").style.display === "block") {
         tampilkanDataBarang();
@@ -462,7 +473,7 @@ function cariBarangDariKetik() {
         if (value === "") continue;
 
         let data = value.split("|");
-        if (data[1] && data[1].toLowerCase() === namaDiketik) {
+        if ((data[1] && data[1].toLowerCase() === namaDiketik) || (data[0] && data[0].toLowerCase() === namaDiketik)) {
             document.getElementById("pilihBarang").value = value;
             document.getElementById("hargaBarang").value = Number(data[2]);
             document.getElementById("stokBarang").value = data[4] === "" ? "" : data[4];
@@ -474,6 +485,163 @@ function cariBarangDariKetik() {
             return;
         }
     }
+}
+
+function shortcutInputBarang(event) {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+
+    let inputNama = document.getElementById("namaBarang");
+    if (inputNama.getAttribute("data-kode")) {
+        document.getElementById("jumlahBeli").focus();
+        document.getElementById("jumlahBeli").select();
+        return;
+    }
+
+    pilihBarangDariKeyword(inputNama.value, false);
+}
+
+function pilihBarangDariKeyword(keyword, langsungTambah) {
+    let kata = String(keyword || "").trim().toLowerCase();
+    if (!kata) return false;
+
+    let kandidat = dataBarang.find(b =>
+        String(b.nama || "").toLowerCase() === kata ||
+        String(b.kode || "").toLowerCase() === kata
+    );
+
+    if (!kandidat) {
+        kandidat = dataBarang.find(b =>
+            String(b.nama || "").toLowerCase().includes(kata) ||
+            String(b.kode || "").toLowerCase().includes(kata)
+        );
+    }
+
+    if (!kandidat) {
+        alert("Barang tidak ditemukan.");
+        return false;
+    }
+
+    return pilihBarangByKode(kandidat.kode, 1, langsungTambah);
+}
+
+function pilihBarangByKode(kode, jumlah, langsungTambah) {
+    let select = document.getElementById("pilihBarang");
+    if (!select) return false;
+
+    let optionValue = "";
+    for (let i = 1; i < select.options.length; i++) {
+        let data = select.options[i].value.split("|");
+        if (data[0] === kode) {
+            optionValue = select.options[i].value;
+            break;
+        }
+    }
+
+    if (!optionValue) return false;
+
+    select.value = optionValue;
+    isiBarangOtomatis();
+    document.getElementById("jumlahBeli").value = jumlah || 1;
+
+    if (langsungTambah) {
+        tambahBarang();
+    } else {
+        let inputJumlah = document.getElementById("jumlahBeli");
+        inputJumlah.focus();
+        inputJumlah.select();
+    }
+
+    return true;
+}
+
+function muatFavoritBarang() {
+    try {
+        favoritBarang = JSON.parse(localStorage.getItem("favoritBarang")) || [];
+    } catch (e) {
+        favoritBarang = [];
+    }
+    renderFavoritBarang();
+}
+
+function simpanFavoritBarang() {
+    localStorage.setItem("favoritBarang", JSON.stringify(favoritBarang));
+}
+
+function tambahFavoritDariInput() {
+    let inputNama = document.getElementById("namaBarang");
+    let kode = inputNama.getAttribute("data-kode") || "";
+
+    if (!kode) {
+        let berhasil = pilihBarangDariKeyword(inputNama.value, false);
+        kode = inputNama.getAttribute("data-kode") || "";
+        if (!berhasil || !kode) return;
+    }
+
+    if (!favoritBarang.includes(kode)) {
+        favoritBarang.push(kode);
+        simpanFavoritBarang();
+        renderFavoritBarang();
+    }
+}
+
+function hapusFavoritBarang(kode) {
+    favoritBarang = favoritBarang.filter(k => k !== kode);
+    simpanFavoritBarang();
+    renderFavoritBarang();
+}
+
+function renderFavoritBarang() {
+    let tempat = document.getElementById("barangFavorit");
+    if (!tempat) return;
+
+    let daftarFavorit = favoritBarang
+        .map(kode => dataBarang.find(b => b.kode === kode))
+        .filter(Boolean);
+
+    if (daftarFavorit.length === 0) {
+        tempat.innerHTML = `<p class="favorite-empty">Belum ada barang favorit.</p>`;
+        return;
+    }
+
+    tempat.innerHTML = "";
+    daftarFavorit.forEach(function(barang) {
+        let item = document.createElement("div");
+        item.className = "favorite-item";
+        item.innerHTML = `
+            <button type="button" title="Masukkan ke keranjang">${escapeHTML(barang.nama)}</button>
+            <button class="favorite-remove" type="button" title="Hapus dari favorit">x</button>
+        `;
+        item.querySelector("button").addEventListener("click", function() {
+            pilihBarangByKode(barang.kode, 1, true);
+        });
+        item.querySelector(".favorite-remove").addEventListener("click", function(event) {
+            event.stopPropagation();
+            hapusFavoritBarang(barang.kode);
+        });
+        tempat.appendChild(item);
+    });
+}
+
+function pasangShortcutKasir() {
+    document.addEventListener("keydown", function(event) {
+        let modalTerbuka = document.getElementById("modalOverlay")?.style.display === "flex" ||
+            document.getElementById("modalBarang")?.style.display === "flex";
+        if (modalTerbuka) return;
+
+        let target = event.target;
+        let sedangKetik = target && ["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName);
+
+        if ((event.key === "/" && !sedangKetik) || event.key === "F2") {
+            event.preventDefault();
+            bukaMenu("kasir");
+            setTimeout(() => {
+                let input = document.getElementById("namaBarang");
+                input.focus();
+                input.select();
+            }, 50);
+        }
+    });
 }
 
 function tampilkanDataBarang() {
@@ -751,6 +919,25 @@ function tambahStokKeSheet() {
     });
 }
 
+function ubahMetodePembayaran() {
+    let metode = document.getElementById("metodePembayaran")?.value || "tunai";
+    let inputPelanggan = document.getElementById("namaPelangganUtang");
+    let inputBayar = document.getElementById("uangBayar");
+
+    if (metode === "utang") {
+        if (inputPelanggan) inputPelanggan.style.display = "block";
+        if (inputBayar) {
+            inputBayar.placeholder = "Pembayaran awal, boleh kosong";
+        }
+    } else {
+        if (inputPelanggan) {
+            inputPelanggan.style.display = "none";
+            inputPelanggan.value = "";
+        }
+        if (inputBayar) inputBayar.placeholder = "Uang bayar";
+    }
+}
+
 //======================================================
 // 7. PEMBAYARAN KASIR
 //======================================================
@@ -758,15 +945,23 @@ function tambahStokKeSheet() {
 function hitungKembalian() {
     if (sudahDibayar) return alert("Transaksi sudah dibayar.");
 
-    let bayar = Number(document.getElementById("uangBayar").value);
+    let metode = document.getElementById("metodePembayaran")?.value || "tunai";
+    let bayar = Number(document.getElementById("uangBayar").value || 0);
     let kasirNama = document.getElementById("namaKasir").value;
+    let namaPelanggan = document.getElementById("namaPelangganUtang")?.value.trim() || "";
 
     if (kasirNama === "") return alert("Nama kasir wajib diisi.");
     if (total <= 0) return alert("Keranjang kosong.");
-    if (bayar < total) return alert("Uang bayar kurang.");
+    if (metode === "utang" && namaPelanggan === "") return alert("Nama pelanggan wajib diisi untuk transaksi utang.");
+    if (metode === "tunai" && bayar < total) return alert("Uang bayar kurang.");
+    if (metode === "utang" && bayar > total) return alert("Pembayaran awal tidak boleh lebih dari total belanja.");
+    document.getElementById("uangBayar").value = bayar;
 
-    let kembalian = bayar - total;
-    document.getElementById("hasilKembalian").innerHTML = "Kembalian: " + formatRupiah(kembalian);
+    let kembalian = metode === "utang" ? 0 : bayar - total;
+    let sisaUtang = metode === "utang" ? total - bayar : 0;
+    document.getElementById("hasilKembalian").innerHTML = metode === "utang"
+        ? "Sisa Utang: " + formatRupiah(sisaUtang)
+        : "Kembalian: " + formatRupiah(kembalian);
 
     buatStruk();
 
@@ -794,6 +989,11 @@ function buatStruk() {
     let kembalian = bayar - total;
     let daftar = "";
     let totalLaba = hitungTotalLaba();
+    let metode = document.getElementById("metodePembayaran")?.value || "tunai";
+    let namaPelanggan = document.getElementById("namaPelangganUtang")?.value.trim() || "";
+    let labelMetode = metode === "utang" ? "UTANG" : "TUNAI";
+    let sisaUtang = metode === "utang" ? Math.max(total - bayar, 0) : 0;
+    if (metode === "utang") kembalian = 0;
 
     // Ambil data profil toko secara real-time dari localStorage
     let namaToko = localStorage.getItem("setNamaToko") || "WARUNG BAROKAH TANJUNG";
@@ -829,8 +1029,10 @@ function buatStruk() {
         daftar + 
         `--------------------------------\n` +
         `TOTAL     : ${formatRupiah(total)}\n` +
+        `METODE    : ${labelMetode}\n` +
+        (metode === "utang" ? `PELANGGAN : ${namaPelanggan}\n` : "") +
         `BAYAR     : ${formatRupiah(bayar)}\n` +
-        `KEMBALIAN : ${formatRupiah(kembalian)}\n` +
+        (metode === "utang" ? `SISA UTANG: ${formatRupiah(sisaUtang)}\n` : `KEMBALIAN : ${formatRupiah(kembalian)}\n`) +
         barisToken + // ⚡ Nomor token otomatis terselip di sini jika ada isinya
         `--------------------------------\n` +
         `${footerToko}\n`;
@@ -844,14 +1046,20 @@ function buatStruk() {
         bayar: bayar,
         kembalian: kembalian,
         totalLaba: totalLaba,
+        metode: metode,
+        pelanggan: namaPelanggan,
+        bayarAwal: bayar,
+        sisaUtang: sisaUtang,
         token: nomorToken, // Tambahkan data token agar ikut terarsip di cloud jika perlu
         items: JSON.parse(JSON.stringify(daftarItem))
     };
 
     fetch(WEB_APP_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(dataTransaksi) });
+    if (metode === "utang") simpanUtangDariTransaksi(dataTransaksi);
 
     // Kosongkan kembali input token setelah transaksi selesai
     document.getElementById("nomorTokenListrik").value = "";
+    if (document.getElementById("namaPelangganUtang")) document.getElementById("namaPelangganUtang").value = "";
 
     setTimeout(function() {
         ambilBarangDariSheet();
@@ -941,16 +1149,17 @@ function tampilkanRiwayat() {
 
     riwayatTransaksi.forEach(function(t, index) {
         let jumlahItem = hitungJumlahItemRiwayat(t);
+        let batal = transaksiSudahBatal(t);
         let baris = document.createElement("tr");
-        baris.className = "riwayat-row";
+        baris.className = "riwayat-row" + (batal ? " transaksi-batal" : "");
         baris.title = "Klik untuk melihat detail transaksi";
         baris.innerHTML = `
             <td style="text-align: center;">${index + 1}</td>
             <td>${escapeHTML(t.tanggal || "-")}</td>
             <td>${escapeHTML(t.kasir || "-")}</td>
             <td style="text-align: center;">${jumlahItem}</td>
-            <td>${formatRupiah(t.total)}</td>
-            <td style="color: #146b5c; font-weight: bold;">${formatRupiah(t.totalLaba || 0)}</td>
+            <td>${formatRupiah(t.total)}${batal ? "<br><span class='status-batal'>Batal/Retur</span>" : ""}</td>
+            <td style="color: #146b5c; font-weight: bold;">${batal ? "-" : formatRupiah(t.totalLaba || 0)}</td>
             <td style="text-align: center;"><button class="btn-mini secondary-button" type="button">Detail</button></td>
         `;
         baris.addEventListener("click", function() {
@@ -989,22 +1198,33 @@ function ambilItemsRiwayat(t) {
 function bukaDetailTransaksi(index) {
     let transaksi = riwayatTransaksi[index];
     if (!transaksi) return;
+    let batal = transaksiSudahBatal(transaksi);
 
     document.getElementById("modalTitleGeneral").innerText = "Detail Transaksi";
     document.getElementById("modalBody").innerHTML = buatHTMLDetailTransaksi(transaksi);
     document.getElementById("modalFooter").innerHTML = `
         <button class="secondary-button" onclick="tutupModal()">Tutup</button>
         <button id="btnCetakUlangStruk" type="button">Cetak Ulang Struk</button>
+        ${batal ? "" : `<button class="danger-button" id="btnBatalTransaksi" type="button">Batal / Retur</button>`}
     `;
     document.getElementById("btnCetakUlangStruk").addEventListener("click", function() {
         cetakUlangStruk(index);
     });
+    let btnBatal = document.getElementById("btnBatalTransaksi");
+    if (btnBatal) {
+        btnBatal.addEventListener("click", function() {
+            tutupModal();
+            bukaModalBatalTransaksi(index);
+        });
+    }
     document.getElementById("modalOverlay").style.display = "flex";
 }
 
 function buatHTMLDetailTransaksi(t) {
     let daftarHTML = "";
     let items = ambilItemsRiwayat(t);
+    let batal = transaksiSudahBatal(t);
+    let metode = t.metode === "utang" ? "Utang Pelanggan" : "Tunai";
 
     if (items.length > 0) {
         daftarHTML = `
@@ -1030,7 +1250,11 @@ function buatHTMLDetailTransaksi(t) {
                 <div><span>Laba</span><strong>${formatRupiah(t.totalLaba || 0)}</strong></div>
                 <div><span>Uang Bayar</span><strong>${formatRupiah(t.bayar || 0)}</strong></div>
                 <div><span>Kembalian</span><strong>${formatRupiah(t.kembalian || 0)}</strong></div>
+                <div><span>Metode</span><strong>${escapeHTML(metode)}</strong></div>
+                <div><span>Status</span><strong>${batal ? "Batal/Retur" : "Selesai"}</strong></div>
+                ${t.metode === "utang" ? `<div><span>Sisa Utang Awal</span><strong>${formatRupiah(t.sisaUtang || 0)}</strong></div>` : ""}
             </div>
+            ${t.pelanggan ? `<p class="detail-token"><strong>Pelanggan:</strong> ${escapeHTML(t.pelanggan)}</p>` : ""}
             ${t.token ? `<p class="detail-token"><strong>Token/Catatan:</strong> ${escapeHTML(t.token)}</p>` : ""}
             <h3>Rincian Barang</h3>
             ${daftarHTML}
@@ -1045,6 +1269,7 @@ function susunStrukDariRiwayat(t) {
     let footerToko = localStorage.getItem("setKakiStruk") || "Terima Kasih";
     let daftar = t.daftar || "";
     let items = ambilItemsRiwayat(t);
+    let metode = t.metode === "utang" ? "UTANG" : "TUNAI";
 
     if ((!daftar || daftar.trim() === "") && items.length > 0) {
         daftar = items.map(item => {
@@ -1071,8 +1296,10 @@ function susunStrukDariRiwayat(t) {
         daftar +
         `--------------------------------\n` +
         `TOTAL     : ${formatRupiah(t.total)}\n` +
+        `METODE    : ${metode}\n` +
+        (t.pelanggan ? `PELANGGAN : ${t.pelanggan}\n` : "") +
         `BAYAR     : ${formatRupiah(t.bayar || 0)}\n` +
-        `KEMBALIAN : ${formatRupiah(t.kembalian || 0)}\n` +
+        (t.metode === "utang" ? `SISA UTANG: ${formatRupiah(t.sisaUtang || 0)}\n` : `KEMBALIAN : ${formatRupiah(t.kembalian || 0)}\n`) +
         barisToken +
         `--------------------------------\n` +
         `${footerToko}\n`;
@@ -1092,6 +1319,244 @@ function hapusRiwayat() {
     alert("Data riwayat sekarang tersinkronisasi aman di sistem Cloud Google Sheets.\nPenghapusan manual dinonaktifkan untuk menjaga keamanan data.");
 }
 
+function buatIdTransaksi(t) {
+    return [
+        t.tanggal || "",
+        t.kasir || "",
+        t.total || 0,
+        (t.daftar || "").slice(0, 60)
+    ].join("|");
+}
+
+function muatTransaksiDibatalkan() {
+    try {
+        transaksiDibatalkan = JSON.parse(localStorage.getItem("transaksiDibatalkan")) || [];
+    } catch (e) {
+        transaksiDibatalkan = [];
+    }
+}
+
+function simpanTransaksiDibatalkan() {
+    localStorage.setItem("transaksiDibatalkan", JSON.stringify(transaksiDibatalkan));
+}
+
+function transaksiSudahBatal(t) {
+    return transaksiDibatalkan.some(r => r.id === buatIdTransaksi(t));
+}
+
+function bukaModalBatalTransaksi(index) {
+    let transaksi = riwayatTransaksi[index];
+    if (!transaksi) return;
+    if (transaksiSudahBatal(transaksi)) return alert("Transaksi ini sudah pernah dibatalkan/diretur.");
+
+    document.getElementById("modalTitleGeneral").innerText = "Batal / Retur Transaksi";
+    document.getElementById("modalBody").innerHTML = `
+        <p>Batalkan transaksi milik <strong>${escapeHTML(transaksi.kasir || "-")}</strong> sebesar <strong>${formatRupiah(transaksi.total)}</strong>?</p>
+        <div class="filter-group">
+            <label>Alasan batal / retur</label>
+            <input type="text" id="alasanBatalTransaksi" placeholder="Contoh: salah input / barang dikembalikan">
+        </div>
+    `;
+    document.getElementById("modalFooter").innerHTML = `
+        <button class="secondary-button" onclick="tutupModal()">Batal</button>
+        <button class="danger-button" id="btnKonfirmasiBatalTransaksi" type="button">Batalkan Transaksi</button>
+    `;
+    document.getElementById("btnKonfirmasiBatalTransaksi").addEventListener("click", function() {
+        eksekusiBatalTransaksi(index);
+    });
+    document.getElementById("modalOverlay").style.display = "flex";
+}
+
+function eksekusiBatalTransaksi(index) {
+    let transaksi = riwayatTransaksi[index];
+    if (!transaksi || transaksiSudahBatal(transaksi)) return;
+
+    let alasan = document.getElementById("alasanBatalTransaksi")?.value.trim() || "Batal/retur transaksi";
+    let record = {
+        id: buatIdTransaksi(transaksi),
+        tanggalBatal: new Date().toLocaleString("id-ID"),
+        alasan: alasan,
+        transaksi: transaksi
+    };
+
+    transaksiDibatalkan.push(record);
+    simpanTransaksiDibatalkan();
+    kembalikanStokLokal(transaksi);
+    tandaiUtangBatal(transaksi);
+
+    fetch(WEB_APP_URL, {
+        method: "POST",
+        mode: "no-cors",
+        body: JSON.stringify({
+            tipe: "batal_transaksi",
+            alasan: alasan,
+            transaksi: transaksi
+        })
+    }).catch(err => console.error("Gagal kirim batal transaksi:", err));
+
+    tutupModal();
+    tampilkanRiwayat();
+    tampilkanRekapHariIni();
+    updateDashboard();
+    if (document.getElementById("menuLaporan").style.display === "block") filterLaporan();
+    alert("Transaksi ditandai batal/retur. Stok lokal sudah dikembalikan.");
+}
+
+function kembalikanStokLokal(transaksi) {
+    let items = ambilRincianBarangTransaksi(transaksi);
+    if (items.length === 0) return;
+
+    dataBarang.forEach(function(barang) {
+        let item = items.find(i => i.kode && i.kode === barang.kode);
+        if (item) barang.stok = Number(barang.stok || 0) + Number(item.jumlah || 0);
+    });
+
+    localStorage.setItem("cacheDataBarang", JSON.stringify(dataBarang));
+    isiDropdownDanTabel(dataBarang);
+}
+
+function muatCatatanUtang() {
+    try {
+        catatanUtang = JSON.parse(localStorage.getItem("catatanUtang")) || [];
+    } catch (e) {
+        catatanUtang = [];
+    }
+}
+
+function simpanCatatanUtang() {
+    localStorage.setItem("catatanUtang", JSON.stringify(catatanUtang));
+}
+
+function simpanUtangDariTransaksi(t) {
+    let totalUtang = Number(t.total || 0);
+    let dibayar = Number(t.bayarAwal || t.bayar || 0);
+    let sisa = Math.max(totalUtang - dibayar, 0);
+    catatanUtang.push({
+        id: buatIdTransaksi(t),
+        tanggal: t.tanggal,
+        pelanggan: t.pelanggan,
+        total: totalUtang,
+        dibayar: dibayar,
+        sisa: sisa,
+        status: sisa <= 0 ? "lunas" : "belum_lunas",
+        pembayaran: dibayar > 0 ? [{
+            tanggal: t.tanggal,
+            jumlah: dibayar,
+            catatan: "Pembayaran awal"
+        }] : [],
+        transaksi: t
+    });
+    simpanCatatanUtang();
+    renderDaftarUtang();
+}
+
+function renderDaftarUtang() {
+    let tbody = document.getElementById("bodyUtang");
+    if (!tbody) return;
+
+    tbody.innerHTML = "";
+    if (catatanUtang.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px;">Belum ada catatan utang.</td></tr>`;
+        return;
+    }
+
+    catatanUtang.forEach(function(utang, index) {
+        let totalUtang = Number(utang.total || 0);
+        let dibayar = Number(utang.dibayar || 0);
+        let sisa = utang.sisa !== undefined ? Number(utang.sisa || 0) : Math.max(totalUtang - dibayar, 0);
+        let lunas = utang.status === "lunas";
+        let batal = utang.status === "batal";
+        if (!batal && sisa <= 0) lunas = true;
+        tbody.innerHTML += `
+            <tr class="${lunas || batal ? "utang-lunas" : ""}">
+                <td>${escapeHTML(utang.tanggal || "-")}</td>
+                <td>${escapeHTML(utang.pelanggan || "-")}</td>
+                <td>${formatRupiah(totalUtang)}</td>
+                <td>${formatRupiah(dibayar)}</td>
+                <td>${batal ? "Batal" : formatRupiah(sisa)}</td>
+                <td style="text-align:center;">
+                    ${lunas || batal ? "" : `<button class="btn-mini" onclick="bukaModalBayarUtang(${index})">Bayar</button>`}
+                </td>
+            </tr>
+        `;
+    });
+}
+
+function tandaiUtangLunas(index) {
+    if (!catatanUtang[index]) return;
+    catatanUtang[index].dibayar = Number(catatanUtang[index].total || 0);
+    catatanUtang[index].sisa = 0;
+    catatanUtang[index].status = "lunas";
+    catatanUtang[index].tanggalLunas = new Date().toLocaleString("id-ID");
+    simpanCatatanUtang();
+    renderDaftarUtang();
+}
+
+function bukaModalBayarUtang(index) {
+    let utang = catatanUtang[index];
+    if (!utang) return;
+
+    let totalUtang = Number(utang.total || 0);
+    let dibayar = Number(utang.dibayar || 0);
+    let sisa = utang.sisa !== undefined ? Number(utang.sisa || 0) : Math.max(totalUtang - dibayar, 0);
+
+    document.getElementById("modalTitleGeneral").innerText = "Bayar Utang";
+    document.getElementById("modalBody").innerHTML = `
+        <p>Pelanggan: <strong>${escapeHTML(utang.pelanggan || "-")}</strong></p>
+        <p>Total: <strong>${formatRupiah(totalUtang)}</strong> | Sudah dibayar: <strong>${formatRupiah(dibayar)}</strong> | Sisa: <strong>${formatRupiah(sisa)}</strong></p>
+        <div class="filter-group">
+            <label>Jumlah pembayaran</label>
+            <input type="number" id="jumlahBayarUtang" placeholder="Contoh: 10000" max="${sisa}">
+        </div>
+    `;
+    document.getElementById("modalFooter").innerHTML = `
+        <button class="secondary-button" onclick="tutupModal()">Batal</button>
+        <button id="btnSimpanBayarUtang" type="button">Simpan Bayar</button>
+    `;
+    document.getElementById("btnSimpanBayarUtang").addEventListener("click", function() {
+        bayarCicilanUtang(index);
+    });
+    document.getElementById("modalOverlay").style.display = "flex";
+}
+
+function bayarCicilanUtang(index) {
+    let utang = catatanUtang[index];
+    if (!utang) return;
+
+    let totalUtang = Number(utang.total || 0);
+    let dibayar = Number(utang.dibayar || 0);
+    let sisa = utang.sisa !== undefined ? Number(utang.sisa || 0) : Math.max(totalUtang - dibayar, 0);
+    let jumlah = Number(document.getElementById("jumlahBayarUtang").value || 0);
+
+    if (jumlah <= 0) return alert("Jumlah pembayaran harus lebih dari 0.");
+    if (jumlah > sisa) return alert("Pembayaran tidak boleh lebih dari sisa utang.");
+
+    utang.dibayar = dibayar + jumlah;
+    utang.sisa = Math.max(sisa - jumlah, 0);
+    utang.status = utang.sisa <= 0 ? "lunas" : "belum_lunas";
+    if (utang.status === "lunas") utang.tanggalLunas = new Date().toLocaleString("id-ID");
+    if (!Array.isArray(utang.pembayaran)) utang.pembayaran = [];
+    utang.pembayaran.push({
+        tanggal: new Date().toLocaleString("id-ID"),
+        jumlah: jumlah,
+        catatan: "Cicilan"
+    });
+
+    simpanCatatanUtang();
+    tutupModal();
+    renderDaftarUtang();
+}
+
+function tandaiUtangBatal(transaksi) {
+    let id = buatIdTransaksi(transaksi);
+    let utang = catatanUtang.find(u => u.id === id);
+    if (!utang) return;
+    utang.status = "batal";
+    utang.tanggalBatal = new Date().toLocaleString("id-ID");
+    simpanCatatanUtang();
+    renderDaftarUtang();
+}
+
 function tampilkanRekapHariIni() {
     let elJumlah = document.getElementById("jumlahTransaksiHariIni");
     let elOmzet = document.getElementById("omzetHariIni");
@@ -1102,7 +1567,7 @@ function tampilkanRekapHariIni() {
     let totalO = 0;
 
     riwayatTransaksi.forEach(function(t) {
-        if (t.tanggal && t.tanggal.includes(hariIni)) {
+        if (t.tanggal && t.tanggal.includes(hariIni) && !transaksiSudahBatal(t)) {
             totalT++;
             totalO += Number(t.total || 0);
         }
@@ -1191,6 +1656,7 @@ function filterLaporan() {
 
     let dataTersaring = riwayatData.filter(function(t) {
         let tglTransaksi = parseTanggalID(t.tanggal);
+        if (transaksiSudahBatal(t)) return false;
         if (tglAwal && tglTransaksi < tglAwal) return false;
         if (tglAkhir && tglTransaksi > tglAkhir) return false;
         return true;
@@ -1198,6 +1664,7 @@ function filterLaporan() {
 
     renderTabelLaporan(dataTersaring);
     renderGrafikPenjualan(dataTersaring);
+    renderBarangTerlaris(dataTersaring);
 }
 
 function renderTabelLaporan(data) {
@@ -1210,8 +1677,7 @@ function renderTabelLaporan(data) {
     let totalTransaksi = data.length;
 
     data.forEach(function(t) {
-        let jumlahItem = 0;
-        if (t.daftar && t.daftar.trim() !== "") jumlahItem = t.daftar.trim().split('\n').length;
+        let jumlahItem = hitungJumlahItemRiwayat(t);
         
         let omzet = Number(t.total) || 0;
         let laba = Number(t.totalLaba) || 0;
@@ -1236,6 +1702,119 @@ function renderTabelLaporan(data) {
     document.getElementById("lapOmzet").innerText = formatRupiah(totalOmzet);
     document.getElementById("lapLaba").innerText = formatRupiah(totalLaba);
     document.getElementById("lapTransaksi").innerText = totalTransaksi;
+}
+
+function ambilRincianBarangTransaksi(t) {
+    let items = ambilItemsRiwayat(t);
+    if (items.length > 0) return items;
+
+    if (!t.daftar || t.daftar.trim() === "") return [];
+
+    let baris = t.daftar.split("\n").map(x => x.trim()).filter(Boolean);
+    let hasil = [];
+    for (let i = 0; i < baris.length; i++) {
+        let detail = baris[i + 1] || "";
+        let cocok = detail.match(/^(\d+)\s*x\s*Rp\s*([\d.]+)\s*=\s*Rp\s*([\d.]+)/i);
+        if (!cocok) continue;
+
+        let nama = baris[i];
+        let jumlah = Number(cocok[1]) || 0;
+        let harga = Number(cocok[2].replace(/\./g, "")) || 0;
+        let subtotal = Number(cocok[3].replace(/\./g, "")) || harga * jumlah;
+        hasil.push({
+            nama: nama,
+            jumlah: jumlah,
+            harga: harga,
+            subtotal: subtotal,
+            laba: 0
+        });
+        i++;
+    }
+    return hasil;
+}
+
+function normalisasiNamaBarang(nama) {
+    return String(nama || "").trim().toLowerCase();
+}
+
+function ambilMasterBarangUntukLaba() {
+    if (Array.isArray(dataBarang) && dataBarang.length > 0) return dataBarang;
+    try {
+        return JSON.parse(localStorage.getItem("cacheDataBarang")) || [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function cariMasterBarangUntukItem(item) {
+    let master = ambilMasterBarangUntukLaba();
+    let kodeItem = String(item.kode || "").trim();
+    let namaItem = normalisasiNamaBarang(item.nama);
+
+    return master.find(function(barang) {
+        let kodeBarang = String(barang.kode || "").trim();
+        let namaBarang = normalisasiNamaBarang(barang.nama);
+        return (kodeItem && kodeBarang === kodeItem) || (namaItem && namaBarang === namaItem);
+    });
+}
+
+function hitungLabaItemTerjual(item) {
+    let jumlah = Number(item.jumlah || 0);
+    let labaTersimpan = Number(item.laba || 0);
+    if (labaTersimpan !== 0) return labaTersimpan;
+
+    let master = cariMasterBarangUntukItem(item);
+    let modal = Number(item.modal || master?.modal || 0);
+    let harga = Number(item.harga || master?.harga || 0);
+
+    if (modal <= 0 || harga <= 0 || jumlah <= 0) return 0;
+    return (harga - modal) * jumlah;
+}
+
+function renderBarangTerlaris(data) {
+    let tbody = document.getElementById("bodyBarangTerlaris");
+    if (!tbody) return;
+
+    let rekap = {};
+    data.forEach(function(t) {
+        ambilRincianBarangTransaksi(t).forEach(function(item) {
+            let nama = item.nama || "-";
+            let kode = item.kode || nama.toLowerCase();
+            if (!rekap[kode]) {
+                rekap[kode] = {
+                    nama: nama,
+                    jumlah: 0,
+                    omzet: 0,
+                    laba: 0
+                };
+            }
+            rekap[kode].jumlah += Number(item.jumlah || 0);
+            rekap[kode].omzet += Number(item.subtotal || (Number(item.harga || 0) * Number(item.jumlah || 0)));
+            rekap[kode].laba += hitungLabaItemTerjual(item);
+        });
+    });
+
+    let daftar = Object.values(rekap)
+        .sort((a, b) => b.jumlah - a.jumlah || b.omzet - a.omzet)
+        .slice(0, 10);
+
+    tbody.innerHTML = "";
+    if (daftar.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:20px;">Belum ada barang terjual.</td></tr>`;
+        return;
+    }
+
+    daftar.forEach(function(item, index) {
+        tbody.innerHTML += `
+            <tr>
+                <td style="text-align: center;">${index + 1}</td>
+                <td>${escapeHTML(item.nama)}</td>
+                <td style="text-align: center; font-weight: bold;">${item.jumlah}</td>
+                <td>${formatRupiah(item.omzet)}</td>
+                <td style="color: var(--green-dark); font-weight: bold;">${formatRupiah(item.laba)}</td>
+            </tr>
+        `;
+    });
 }
 
 function renderGrafikPenjualan(dataTersaring) {
@@ -1387,7 +1966,7 @@ function updateDashboard() {
     // 1. Hitung Rekap Transaksi Hari Ini berdasarkan Cache Riwayat Cloud
     let riwayatData = JSON.parse(localStorage.getItem("cacheDataRiwayat")) || [];
     riwayatData.forEach(function(t) {
-        if (t.tanggal && t.tanggal.includes(hariIni)) {
+        if (t.tanggal && t.tanggal.includes(hariIni) && !transaksiSudahBatal(t)) {
             totalTransaksi++;
             totalOmzet += Number(t.total || 0);
             totalLaba += Number(t.totalLaba || 0);
