@@ -101,6 +101,13 @@
                     <!-- Input Belanja -->
                     <div class="card">
                         <h2>Input Belanja</h2>
+                        <div class="favorite-section full">
+                            <div class="favorite-header">
+                                <strong>Barang Favorit</strong>
+                                <button class="btn-mini secondary-button" type="button" onclick="tambahFavoritDariInput()">Simpan Favorit</button>
+                            </div>
+                            <div id="barangFavorit" class="favorite-bar"></div>
+                        </div>
                         <div class="form-grid">
                             <input class="full" id="namaKasir" placeholder="Nama kasir" oninput="simpanNamaKasir()">
                             
@@ -118,7 +125,7 @@
                             
                             <select class="full" id="pilihBarang" onchange="isiBarangOtomatis()"></select>
                             
-                            <input id="namaBarang" placeholder="Nama barang" list="daftarBarang" oninput="cariBarangDariKetik()">
+                            <input id="namaBarang" placeholder="Cari nama barang atau kode" list="daftarBarang" oninput="cariBarangDariKetik()" onkeydown="shortcutInputBarang(event)">
                             <datalist id="daftarBarang"></datalist>
                             
                             <input id="hargaBarang" type="number" placeholder="Harga barang">
@@ -145,6 +152,13 @@
                             <div class="filter-group full" id="boxTokenListrik" style="margin-top: 10px;">
                                 <label for="nomorTokenListrik">⚡ Nomor Token PLN / Catatan Voucher</label>
                                 <input type="text" id="nomorTokenListrik" placeholder="Contoh: 1234-5678-xxxx-xxxx-xxxx" style="font-weight: bold; letter-spacing: 2px;">
+                            </div>
+                            <div class="form-grid full payment-grid">
+                                <select id="metodePembayaran" onchange="ubahMetodePembayaran()">
+                                    <option value="tunai">Tunai</option>
+                                    <option value="utang">Utang Pelanggan</option>
+                                </select>
+                                <input id="namaPelangganUtang" type="text" placeholder="Nama pelanggan" style="display:none;">
                             </div>
                             <input id="uangBayar" type="number" placeholder="Uang bayar" onkeydown="enterBayar(event)">
                             <div class="button-row">
@@ -337,6 +351,26 @@
 
                 <!-- 📋 Tabel Data & Export -->
                 <div class="card">
+                    <h2>Barang Paling Laku</h2>
+                    <div class="table-container-master">
+                        <table id="tabelBarangTerlaris">
+                            <thead>
+                                <tr>
+                                    <th style="width: 8%; text-align: center;">No</th>
+                                    <th style="width: 42%;">Barang</th>
+                                    <th style="width: 15%; text-align: center;">Terjual</th>
+                                    <th style="width: 20%;">Omzet</th>
+                                    <th style="width: 15%;">Laba</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bodyBarangTerlaris">
+                                <!-- Data otomatis diisi -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card">
                     <div class="card-header-row">
                         <h2>Rincian Transaksi</h2>
                         <div class="action-buttons-cell">
@@ -397,6 +431,30 @@
 
                     <div style="margin-top: 20px;">
                         <button onclick="simpanPengaturanToko()">💾 Simpan Pengaturan</button>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-top: 16px;">
+                    <div class="card-header-row">
+                        <h2>Catatan Utang Pelanggan</h2>
+                        <button class="secondary-button btn-mini" onclick="renderDaftarUtang()">Refresh</button>
+                    </div>
+                    <div class="table-container-master">
+                        <table id="tabelUtang">
+                            <thead>
+                                <tr>
+                                    <th style="width: 18%;">Tanggal</th>
+                                    <th style="width: 20%;">Pelanggan</th>
+                                    <th style="width: 16%;">Total</th>
+                                    <th style="width: 16%;">Dibayar</th>
+                                    <th style="width: 16%;">Sisa</th>
+                                    <th style="width: 14%; text-align:center;">Aksi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bodyUtang">
+                                <!-- Data otomatis diisi -->
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             </div>
