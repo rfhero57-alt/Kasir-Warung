@@ -175,6 +175,58 @@ button:hover:not(:disabled) {
   grid-column: 1 / -1;
 }
 
+.favorite-section {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.favorite-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.favorite-header .btn-mini {
+  min-height: 32px;
+}
+
+.favorite-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 38px;
+}
+
+.favorite-item {
+  display: inline-flex;
+  align-items: stretch;
+  max-width: 100%;
+}
+
+.favorite-item button {
+  width: auto;
+  min-height: 36px;
+  border-radius: 8px 0 0 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+.favorite-item .favorite-remove {
+  min-width: 32px;
+  border-left: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 0 8px 8px 0;
+  background: var(--red);
+  padding: 7px 9px;
+}
+
+.favorite-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
 /* ==========================================================================
    COMPONENTS
    ========================================================================== */
@@ -346,7 +398,9 @@ pre {
 
 #tabelRiwayat, 
 #tabelBarangMaster,
-#tabelLaporan {
+#tabelLaporan,
+#tabelBarangTerlaris,
+#tabelUtang {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.85rem;
@@ -356,7 +410,9 @@ pre {
 
 #tabelRiwayat th, #tabelRiwayat td,
 #tabelBarangMaster th, #tabelBarangMaster td,
-#tabelLaporan th, #tabelLaporan td {
+#tabelLaporan th, #tabelLaporan td,
+#tabelBarangTerlaris th, #tabelBarangTerlaris td,
+#tabelUtang th, #tabelUtang td {
   padding: 10px 8px;
   border-bottom: 1px solid #eee;
   white-space: nowrap;
@@ -367,7 +423,9 @@ pre {
 
 #tabelRiwayat th,
 #tabelBarangMaster th,
-#tabelLaporan th {
+#tabelLaporan th,
+#tabelBarangTerlaris th,
+#tabelUtang th {
   background: #f5f5f5 !important;
   color: var(--ink) !important;
   position: sticky;
@@ -379,18 +437,38 @@ pre {
 
 #tabelRiwayat tbody tr:nth-child(even),
 #tabelBarangMaster tbody tr:nth-child(even),
-#tabelLaporan tbody tr:nth-child(even) {
+#tabelLaporan tbody tr:nth-child(even),
+#tabelBarangTerlaris tbody tr:nth-child(even),
+#tabelUtang tbody tr:nth-child(even) {
   background: #fffdfb !important;
 }
 
 #tabelRiwayat tbody tr:hover,
 #tabelBarangMaster tbody tr:hover,
-#tabelLaporan tbody tr:hover {
+#tabelLaporan tbody tr:hover,
+#tabelBarangTerlaris tbody tr:hover,
+#tabelUtang tbody tr:hover {
   background-color: #fdfaf2 !important;
 }
 
 .riwayat-row {
   cursor: pointer;
+}
+
+.transaksi-batal {
+  opacity: 0.68;
+  text-decoration: line-through;
+}
+
+.status-batal {
+  color: var(--red);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.utang-lunas {
+  opacity: 0.68;
 }
 
 /* --- Kolom Lebar Tabel Riwayat & Laporan --- */
