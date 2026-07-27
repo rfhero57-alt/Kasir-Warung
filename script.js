@@ -17,6 +17,7 @@ let grafikLaporan = null; // Variabel grafik
 let favoritBarang = [];
 let catatanUtang = [];
 let transaksiDibatalkan = [];
+let kodeBarangTerhapus = [];
 
 //======================================================
 // 2. INISIALISASI SAAT APLIKASI DIBUKA
@@ -28,12 +29,13 @@ window.onload = function () {
     muatFavoritBarang();
     muatCatatanUtang();
     muatTransaksiDibatalkan();
+    muatKodeBarangTerhapus();
     pasangShortcutKasir();
     
     // ⚡ Memuat Cache Barang agar langsung tampil (Instan)
     let cacheBarang = localStorage.getItem("cacheDataBarang");
     if (cacheBarang) {
-        dataBarang = JSON.parse(cacheBarang);
+        dataBarang = filterBarangTerhapus(JSON.parse(cacheBarang));
         isiDropdownDanTabel(dataBarang);
     }
     
@@ -350,6 +352,41 @@ function filterBarangMaster() {
         baris[i].style.display = (cocokKeyword && cocokKategori) ? "" : "none";
     }
 }
+
+function muatKodeBarangTerhapus() {
+    try {
+        kodeBarangTerhapus = JSON.parse(localStorage.getItem("kodeBarangTerhapus")) || [];
+    } catch (e) {
+        kodeBarangTerhapus = [];
+    }
+}
+
+function simpanKodeBarangTerhapus() {
+    localStorage.setItem("kodeBarangTerhapus", JSON.stringify(kodeBarangTerhapus));
+}
+
+function tandaiBarangTerhapus(kode) {
+    let kodeBersih = String(kode || "").trim();
+    if (!kodeBersih) return;
+    if (!kodeBarangTerhapus.includes(kodeBersih)) {
+        kodeBarangTerhapus.push(kodeBersih);
+        simpanKodeBarangTerhapus();
+    }
+}
+
+function batalTandaiBarangTerhapus(kode) {
+    let kodeBersih = String(kode || "").trim();
+    kodeBarangTerhapus = kodeBarangTerhapus.filter(k => k !== kodeBersih);
+    simpanKodeBarangTerhapus();
+}
+
+function filterBarangTerhapus(data) {
+    let daftar = Array.isArray(data) ? data : [];
+    return daftar.filter(function(barang) {
+        return !kodeBarangTerhapus.includes(String(barang.kode || "").trim());
+    });
+}
+
 function ambilBarangDariSheet() {
     let elStatus = document.getElementById("statusSinkron");
     if (elStatus) {
@@ -358,8 +395,8 @@ function ambilBarangDariSheet() {
     }
 
     window.terimaDataBarang = function(data) {
-        dataBarang = data;
-        localStorage.setItem("cacheDataBarang", JSON.stringify(data));
+        dataBarang = filterBarangTerhapus(data);
+        localStorage.setItem("cacheDataBarang", JSON.stringify(dataBarang));
         isiDropdownDanTabel(dataBarang);
         updateDashboard();
         
@@ -737,6 +774,8 @@ function simpanBarangModal() {
         return;
     }
 
+    batalTandaiBarangTerhapus(kodeBaru || kodeLama);
+
     let payload = {
         tipe: (mode === "edit") ? "update_barang" : "barang_baru",
         kode: (mode === "edit") ? kodeLama : (kodeBaru || "BRG-" + Date.now()),
@@ -863,16 +902,33 @@ function eksekusiHapusBarang(kode, nama) {
         elStatus.classList.add("show", "loading");
     }
 
+    tandaiBarangTerhapus(kode);
+    dataBarang = dataBarang.filter(function(barang) {
+        return String(barang.kode || "") !== String(kode || "");
+    });
+    localStorage.setItem("cacheDataBarang", JSON.stringify(dataBarang));
+    isiDropdownDanTabel(dataBarang);
+    tampilkanDataBarang();
+    updateDashboard();
+
     fetch(WEB_APP_URL, {
         method: "POST",
         mode: "no-cors",
         body: JSON.stringify({
             tipe: "hapus_barang",
+            action: "hapus_barang",
+            aksi: "hapus_barang",
+            mode: "hapus",
             kode: kode,
             nama: nama
         })
     })
     .then(() => {
+        if (elStatus) {
+            elStatus.innerHTML = "Barang dihapus";
+            elStatus.classList.remove("loading");
+            setTimeout(() => elStatus.classList.remove("show"), 2000);
+        }
         setTimeout(ambilBarangDariSheet, 2000);
     })
     .catch(err => {
