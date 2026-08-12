@@ -386,7 +386,6 @@ function filterBarangTerhapus(data) {
         return !kodeBarangTerhapus.includes(String(barang.kode || "").trim());
     });
 }
-
 function ambilBarangDariSheet() {
     let elStatus = document.getElementById("statusSinkron");
     if (elStatus) {
@@ -394,7 +393,17 @@ function ambilBarangDariSheet() {
         elStatus.classList.add("show", "loading");
     }
 
+    // Timer proteksi jika koneksi/server macet lebih dari 10 detik
+    let timerTimeout = setTimeout(() => {
+        if (elStatus && elStatus.classList.contains("loading")) {
+            elStatus.innerHTML = "⚠️ Offline / Gagal Sinkron";
+            elStatus.classList.remove("loading");
+            setTimeout(() => elStatus.classList.remove("show"), 3000);
+        }
+    }, 10000);
+
     window.terimaDataBarang = function(data) {
+        clearTimeout(timerTimeout); // Batalkan timeout jika berhasil
         dataBarang = filterBarangTerhapus(data);
         localStorage.setItem("cacheDataBarang", JSON.stringify(dataBarang));
         isiDropdownDanTabel(dataBarang);
@@ -413,6 +422,17 @@ function ambilBarangDariSheet() {
     let script = document.createElement("script");
     script.id = "loadBarang";
     script.src = WEB_APP_URL + "?callback=terimaDataBarang";
+
+    // Tangkap error jika script gagal dimuat (misal 404 / koneksi terputus)
+    script.onerror = function() {
+        clearTimeout(timerTimeout);
+        if (elStatus) {
+            elStatus.innerHTML = "❌ Gagal Terhubung ke Server";
+            elStatus.classList.remove("loading");
+            setTimeout(() => elStatus.classList.remove("show"), 3000);
+        }
+    };
+
     document.body.appendChild(script);
 }
 
@@ -911,18 +931,7 @@ function eksekusiHapusBarang(kode, nama) {
     tampilkanDataBarang();
     updateDashboard();
 
-    fetch(WEB_APP_URL, {
-        method: "POST",
-        mode: "no-cors",
-        body: JSON.stringify({
-            tipe: "hapus_barang",
-            action: "hapus_barang",
-            aksi: "hapus_barang",
-            mode: "hapus",
-            kode: kode,
-            nama: nama
-        })
-    })
+    kirimHapusBarangKeSheet(kode, nama)
     .then(() => {
         if (elStatus) {
             elStatus.innerHTML = "Barang dihapus";
@@ -934,6 +943,34 @@ function eksekusiHapusBarang(kode, nama) {
     .catch(err => {
         console.error("Gagal hapus barang:", err);
         if(elStatus) elStatus.classList.remove("show");
+    });
+}
+
+function kirimHapusBarangKeSheet(kode, nama) {
+    let payload = {
+        tipe: "remove_barang",
+        action: "hapus_barang",
+        aksi: "hapus_barang",
+        mode: "hapus",
+        kode: kode,
+        nama: nama
+    };
+
+    window.responHapusBarang = function() {};
+
+    let scriptLama = document.getElementById("hapusBarangSheet");
+    if (scriptLama) scriptLama.remove();
+
+    let script = document.createElement("script");
+    script.id = "hapusBarangSheet";
+    script.src = WEB_APP_URL +
+        `?callback=responHapusBarang&tipe=remove_barang&action=hapus_barang&aksi=hapus_barang&mode=hapus&kode=${encodeURIComponent(kode)}&nama=${encodeURIComponent(nama)}`;
+    document.body.appendChild(script);
+
+    return fetch(WEB_APP_URL, {
+        method: "POST",
+        mode: "no-cors",
+        body: JSON.stringify(payload)
     });
 }
 
