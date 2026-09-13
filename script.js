@@ -1434,7 +1434,8 @@ function simpanTransaksiDibatalkan() {
 }
 
 function transaksiSudahBatal(t) {
-    return transaksiDibatalkan.some(r => r.id === buatIdTransaksi(t));
+    return Boolean(t.batal) ||
+        transaksiDibatalkan.some(r => r.id === buatIdTransaksi(t));
 }
 
 function bukaModalBatalTransaksi(index) {
