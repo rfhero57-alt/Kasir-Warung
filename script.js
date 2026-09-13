@@ -2,7 +2,7 @@
 // 1. KONFIGURASI & VARIABEL GLOBAL
 //======================================================
 
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzVW8Egd_kGlEMBT9Px6L9azaap_1Gxq_T3R460P7oKFoVhtfPbR2K4YHyNQVDVavg2/exec";
+const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzYDxO4Rzs6Q9cms0rzfRXQoSkgy2Rk9zeeREDQn5YzGHtmHVUoK7ZFDdnm3Gi05DMt/exec";
 
 let daftarItem = [];
 let dataBarang = [];
